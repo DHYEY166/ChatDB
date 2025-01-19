@@ -1,5 +1,5 @@
 matplotlib==3.10.0
-mysql_connector_repackaged==0.3.1
+mysql-connector-python
 nltk==3.9.1
 numpy==2.2.2
 pandas==2.2.3
