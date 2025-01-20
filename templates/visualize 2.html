@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Visualize Data</h2>
+
+<form id="visualize-form" method="POST">
+    <label for="db-type" class="form-label">Database Type</label>
+    <select id="db-type" name="db_type" class="form-select">
+        <option value="sql">SQL</option>
+        <option value="nosql">NoSQL</option>
+    </select>
+
+    <label for="query" class="form-label mt-3">Query</label>
+    <textarea id="query" name="query" class="form-control mb-3" rows="5" placeholder="Enter your query here"></textarea>
+
+    <label for="x-axis" class="form-label">X-Axis Column</label>
+    <input type="text" id="x-axis" name="x_axis" class="form-control mb-3" placeholder="Enter X-axis column name">
+
+    <label for="y-axis" class="form-label">Y-Axis Column</label>
+    <input type="text" id="y-axis" name="y_axis" class="form-control mb-3" placeholder="Enter Y-axis column name">
+
+    <label for="chart-type" class="form-label">Chart Type</label>
+    <select id="chart-type" name="chart_type" class="form-select mb-3">
+        <option value="bar">Bar</option>
+        <option value="line">Line</option>
+        <option value="scatter">Scatter</option>
+    </select>
+
+    <button type="submit" class="btn btn-primary">Generate Visualization</button>
+</form>
+
+<div class="mt-4">
+    <h4>Generated Chart:</h4>
+    <img id="chart" src="{{ url_for('static', filename='plot.png') }}" alt="Generated Chart" class="img-fluid">
+</div>
+{% endblock %}
+
