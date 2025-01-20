@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Manage Data</h2>
+
+<div class="mb-4">
+    <button id="list-sql-tables" class="btn btn-primary">List SQL Tables</button>
+    <button id="list-nosql-collections" class="btn btn-secondary">List NoSQL Collections</button>
+</div>
+
+<div>
+    <h4>Execute a Query</h4>
+    <form id="query-form" class="mb-3">
+        <label for="db-type" class="form-label">Database Type</label>
+        <select id="db-type" class="form-select">
+            <option value="sql">SQL</option>
+            <option value="nosql">NoSQL</option>
+        </select>
+
+        <label for="query" class="form-label mt-3">Query</label>
+        <textarea id="query" class="form-control" rows="5" placeholder="Enter your query here"></textarea>
+
+        <label for="collection-name" class="form-label mt-3">Collection Name (for NoSQL)</label>
+        <input type="text" id="collection-name" class="form-control" placeholder="Enter collection name">
+
+        <button type="submit" class="btn btn-primary mt-3">Execute Query</button>
+    </form>
+</div>
+
+<div>
+    <h4>Data Output:</h4>
+    <pre id="data-output"></pre>
+</div>
+{% endblock %}
