@@ -1,6 +1,6 @@
-email,id,name
-alice@example.com,1,Alice
-alice@example.com,2,Alice
-alice@example.com,3,Alice
-alice@example.com,4,Alice
-dhyey@gmail.com,5,Dhyey
+sale_date,sales_amount,sales_quantity
+2023-01-15,150.5,10
+2023-01-16,75.25,5
+2023-01-17,100.0,8
+2023-01-18,105.35,7
+2023-01-19,45.5,3
