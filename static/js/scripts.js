@@ -100,11 +100,76 @@ document.getElementById("query-form")?.addEventListener("submit", async (e) => {
             body: JSON.stringify(payload),
         });
         const result = await res.json();
-        document.getElementById("data-output").textContent = JSON.stringify(result.data || result.error, null, 2);
+
+        // Clear previous output
+        const dataOutput = document.getElementById("data-output");
+        dataOutput.innerHTML = "";
+
+        // Add JSON Output title and display JSON
+        const jsonTitle = document.createElement("h5");
+        jsonTitle.textContent = "JSON Output:";
+        dataOutput.appendChild(jsonTitle);
+
+        const jsonOutput = document.createElement("pre");
+        jsonOutput.textContent = JSON.stringify(result.data, null, 2);
+        dataOutput.appendChild(jsonOutput);
+
+        // Add Tabular Output title and display table if data exists
+        if (result.data && result.data.length > 0) {
+            const tableTitle = document.createElement("h5");
+            tableTitle.textContent = "Tabular Output:";
+            dataOutput.appendChild(tableTitle);
+
+            const table = document.createElement("table");
+            table.border = "1";
+            table.style.borderCollapse = "collapse";
+            table.style.width = "100%";
+
+            // Create table headers
+            const headers = Object.keys(result.data[0]);
+            const thead = document.createElement("thead");
+            const headerRow = document.createElement("tr");
+
+            headers.forEach((header) => {
+                const th = document.createElement("th");
+                th.textContent = header;
+                th.style.border = "1px solid black";
+                th.style.padding = "8px";
+                th.style.textAlign = "left";
+                headerRow.appendChild(th);
+            });
+
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Create table rows
+            const tbody = document.createElement("tbody");
+            result.data.forEach((row) => {
+                const tr = document.createElement("tr");
+                headers.forEach((header) => {
+                    const td = document.createElement("td");
+                    td.textContent = row[header];
+                    td.style.border = "1px solid black";
+                    td.style.padding = "8px";
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            table.appendChild(tbody);
+            dataOutput.appendChild(table);
+        } else {
+            const noDataMessage = document.createElement("p");
+            noDataMessage.textContent = "No data available or an error occurred.";
+            dataOutput.appendChild(noDataMessage);
+        }
     } catch (error) {
         alert("An error occurred while executing the query.");
     }
 });
+
+
+
 
 // Generate Visualization
 document.getElementById("visualize-form")?.addEventListener("submit", async (e) => {
@@ -126,7 +191,7 @@ document.getElementById("visualize-form")?.addEventListener("submit", async (e) 
 
     try {
         const res = await fetch("/visualize", {
-            method: "POST", // Ensure POST is used
+            method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
@@ -141,6 +206,8 @@ document.getElementById("visualize-form")?.addEventListener("submit", async (e) 
         alert("An error occurred while generating the visualization.");
     }
 });
+
+
 
 
 // Generate Report
