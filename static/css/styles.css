@@ -1,0 +1,50 @@
+/* General Body Styling */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+    margin: 0;
+    padding: 0;
+}
+
+/* Navbar Styling */
+.navbar {
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Page Container */
+.container {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Buttons */
+.btn {
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 5px;
+}
+
+/* Form Elements */
+.form-label {
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+/* Data Output Styling */
+pre {
+    background-color: #e9ecef;
+    padding: 10px;
+    border-radius: 5px;
+    overflow: auto;
+}
+
+/* Visualization Chart Styling */
+img {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-top: 15px;
+}

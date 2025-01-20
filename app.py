@@ -1,157 +1,152 @@
-import streamlit as st
+from flask import Flask, render_template, jsonify, request
+from flask_sqlalchemy import SQLAlchemy
+from pymongo import MongoClient
+from sqlalchemy import text
 import pandas as pd
-import importlib.util
 import os
+import openai
+import logging
 
-# Load the uploaded files dynamically
-def load_module_from_path(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+# Initialize Flask app
+app = Flask(__name__)
 
-# Paths to uploaded files
-chatdb_path = "chatDB.py"
-database_setup_path = "database_setup.py"
+# Ensure the data/ directory exists
+if not os.path.exists("data"):
+    os.makedirs("data")
 
-# Load modules
-if os.path.exists(chatdb_path):
-    chatDB = load_module_from_path("chatDB", chatdb_path)
-else:
-    st.error("chatDB.py not found!")
+# Configure the SQLite database
+db_path = os.path.abspath("data/example.db")
+print(f"Database Path: {db_path}")  # Debugging the database path
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-if os.path.exists(database_setup_path):
-    database_setup = load_module_from_path("database_setup", database_setup_path)
-else:
-    st.error("database_setup.py not found!")
+# MongoDB Configuration
+mongo_client = None
+mongo_db = None
 
-# Streamlit App
-st.title("ChatDB Application")
+# OpenAI API Key
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-menu_options = [
-    "Connect to SQL Database",
-    "Connect to NoSQL Database",
-    "List tables/collections",
-    "View sample data",
-    "Execute natural language query",
-    "Execute custom query",
-    "Visualize data",
-    "Get query suggestions",
-    "Generate database report",
-    "Exit",
-]
+# Logging configuration
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-selected_option = st.sidebar.selectbox("ChatDB Menu", menu_options)
+# Define a Sample Model
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
 
-# Functions for each task
-def connect_to_sql():
-    st.subheader("Connect to SQL Database")
-    connection_string = st.text_input("Enter SQL connection string:")
-    if st.button("Connect"):
-        try:
-            conn = database_setup.connect_to_sql(connection_string)
-            st.success("Connected to SQL database!")
-            return conn
-        except Exception as e:
-            st.error(f"Error connecting to SQL database: {e}")
+    def __repr__(self):
+        return f"<User {self.name}>"
 
-def connect_to_nosql():
-    st.subheader("Connect to NoSQL Database")
-    connection_details = st.text_input("Enter NoSQL connection details:")
-    if st.button("Connect"):
-        try:
-            conn = database_setup.connect_to_nosql(connection_details)
-            st.success("Connected to NoSQL database!")
-            return conn
-        except Exception as e:
-            st.error(f"Error connecting to NoSQL database: {e}")
+@app.route('/')
+def index():
+    return render_template('index.html', title="Home")
 
-def list_tables(conn):
-    st.subheader("List Tables/Collections")
+@app.route('/connect', methods=['GET', 'POST'])
+def connect_page():
+    if request.method == 'POST':
+        db_type = request.json.get('db_type')  # 'sql' or 'nosql'
+        if db_type == 'sql':
+            db_uri = request.json.get('db_uri')
+            if not db_uri:
+                return jsonify({"error": "SQL Database URI is required."}), 400
+            try:
+                app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+                db.engine.dispose()  # Close existing connections
+                with app.app_context():
+                    db.create_all()
+                return jsonify({"message": f"Connected to SQL database: {db_uri}"})
+            except Exception as e:
+                logger.error(f"Error connecting to SQL: {e}")
+                return jsonify({"error": str(e)}), 500
+        elif db_type == 'nosql':
+            mongo_uri = request.json.get('mongo_uri')
+            db_name = request.json.get('db_name')
+            if not mongo_uri or not db_name:
+                return jsonify({"error": "MongoDB URI and database name are required."}), 400
+            try:
+                global mongo_client, mongo_db
+                mongo_client = MongoClient(mongo_uri)
+                mongo_db = mongo_client[db_name]
+                return jsonify({"message": f"Connected to MongoDB database: {db_name}"})
+            except Exception as e:
+                logger.error(f"Error connecting to MongoDB: {e}")
+                return jsonify({"error": str(e)}), 500
+    return render_template('connect.html', title="Connect to Database")
+
+@app.route('/manage', methods=['GET', 'POST'])
+def manage_page():
+    if request.method == 'POST':
+        db_type = request.json.get('db_type')
+        query = request.json.get('query')
+        if db_type == 'sql':
+            try:
+                with db.engine.connect() as connection:
+                    result = connection.execute(text(query))
+                    if result.returns_rows:
+                        # Convert RowMapping objects to JSON-serializable dictionaries
+                        data = [dict(row._mapping) for row in result]
+                        return jsonify({"data": data})
+                    else:
+                        # Handle non-row-returning queries
+                        connection.commit()
+                        return jsonify({"message": "Query executed successfully."})
+            except Exception as e:
+                logger.error(f"SQL query error: {e}")
+                return jsonify({"error": str(e)}), 500
+        elif db_type == 'nosql':
+            collection_name = request.json.get('collection_name')
+            if not collection_name:
+                return jsonify({"error": "Collection name is required for NoSQL queries."}), 400
+            try:
+                collection = mongo_db[collection_name]
+                data = list(collection.find(query))
+                return jsonify({"data": data})
+            except Exception as e:
+                logger.error(f"NoSQL query error: {e}")
+                return jsonify({"error": str(e)}), 500
+    return render_template('manage.html', title="Manage Data")
+
+
+
+@app.route('/visualize', methods=['POST'])
+def visualize_page():
+    print(f"Request method: {request.method}")  # Debug the method
+    data = request.json.get('data')
+    x_axis = request.json.get('x_axis')
+    y_axis = request.json.get('y_axis')
+    chart_type = request.json.get('chart_type', 'bar')
+    plot_path = 'static/plot.png'
     try:
-        tables = chatDB.list_tables(conn)
-        st.write(tables)
+        df = pd.DataFrame(data)
+        if chart_type == 'bar':
+            df.plot(kind='bar', x=x_axis, y=y_axis).get_figure().savefig(plot_path)
+        elif chart_type == 'line':
+            df.plot(kind='line', x=x_axis, y=y_axis).get_figure().savefig(plot_path)
+        elif chart_type == 'scatter':
+            df.plot(kind='scatter', x=x_axis, y=y_axis).get_figure().savefig(plot_path)
+        return jsonify({"message": "Visualization created.", "plot_url": plot_path})
     except Exception as e:
-        st.error(f"Error listing tables: {e}")
+        return jsonify({"error": str(e)}), 500
 
-def view_sample_data(conn):
-    st.subheader("View Sample Data")
-    table_name = st.text_input("Enter table/collection name:")
-    if st.button("View"):
-        try:
-            sample_data = chatDB.view_sample_data(conn, table_name)
-            st.write(sample_data)
-        except Exception as e:
-            st.error(f"Error viewing sample data: {e}")
 
-def execute_nl_query(conn):
-    st.subheader("Execute Natural Language Query")
-    query = st.text_area("Enter natural language query:")
-    if st.button("Run Query"):
-        try:
-            result = chatDB.execute_nl_query(conn, query)
-            st.write(result)
-        except Exception as e:
-            st.error(f"Error executing query: {e}")
 
-def execute_custom_query(conn):
-    st.subheader("Execute Custom Query")
-    query = st.text_area("Enter SQL/NoSQL query:")
-    if st.button("Run Query"):
-        try:
-            result = chatDB.execute_custom_query(conn, query)
-            st.write(result)
-        except Exception as e:
-            st.error(f"Error executing query: {e}")
+@app.route('/report', methods=['POST'])
+def report_page():
+    data = request.json.get('data')
+    report_path = 'static/report.csv'
+    try:
+        df = pd.DataFrame(data)
+        df.to_csv(report_path, index=False)
+        return jsonify({"message": "Report generated.", "report_url": report_path})
+    except Exception as e:
+        logger.error(f"Report generation error: {e}")
+        return jsonify({"error": str(e)}), 500
 
-def visualize_data(conn):
-    st.subheader("Visualize Data")
-    table_name = st.text_input("Enter table/collection name:")
-    if st.button("Visualize"):
-        try:
-            data = chatDB.view_sample_data(conn, table_name)
-            df = pd.DataFrame(data)
-            st.line_chart(df)  # You can use other visualizations like st.bar_chart
-        except Exception as e:
-            st.error(f"Error visualizing data: {e}")
-
-def get_query_suggestions():
-    st.subheader("Get Query Suggestions")
-    query_context = st.text_area("Describe the query context:")
-    if st.button("Get Suggestions"):
-        try:
-            suggestions = chatDB.get_query_suggestions(query_context)
-            st.write(suggestions)
-        except Exception as e:
-            st.error(f"Error getting suggestions: {e}")
-
-def generate_report(conn):
-    st.subheader("Generate Database Report")
-    if st.button("Generate"):
-        try:
-            report = chatDB.generate_report(conn)
-            st.download_button("Download Report", report, "database_report.txt")
-        except Exception as e:
-            st.error(f"Error generating report: {e}")
-
-# Main application logic
-if selected_option == "Connect to SQL Database":
-    conn = connect_to_sql()
-elif selected_option == "Connect to NoSQL Database":
-    conn = connect_to_nosql()
-elif selected_option == "List tables/collections":
-    list_tables(conn)
-elif selected_option == "View sample data":
-    view_sample_data(conn)
-elif selected_option == "Execute natural language query":
-    execute_nl_query(conn)
-elif selected_option == "Execute custom query":
-    execute_custom_query(conn)
-elif selected_option == "Visualize data":
-    visualize_data(conn)
-elif selected_option == "Get query suggestions":
-    get_query_suggestions()
-elif selected_option == "Generate database report":
-    generate_report(conn)
-elif selected_option == "Exit":
-    st.info("Thank you for using ChatDB!")
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()  # Creates the database and tables
+    app.run(debug=True)
