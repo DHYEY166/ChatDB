@@ -2,6 +2,7 @@ from flask import Flask, render_template, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from pymongo import MongoClient
 from sqlalchemy import text
+from sqlalchemy.orm import sessionmaker
 import pandas as pd
 import os
 import openai
@@ -20,6 +21,12 @@ print(f"Database Path: {db_path}")  # Debugging the database path
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+# Setup SQLAlchemy session
+with app.app_context():
+    engine = db.engine
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
 # MongoDB Configuration
 mongo_client = None
@@ -84,16 +91,14 @@ def manage_page():
         query = request.json.get('query')
         if db_type == 'sql':
             try:
-                with db.engine.connect() as connection:
-                    result = connection.execute(text(query))
-                    if result.returns_rows:
-                        # Convert RowMapping objects to JSON-serializable dictionaries
-                        data = [dict(row._mapping) for row in result]
-                        return jsonify({"data": data})
-                    else:
-                        # Handle non-row-returning queries
-                        connection.commit()
-                        return jsonify({"message": "Query executed successfully."})
+                result = session.execute(text(query)).fetchall()
+                if result:
+                    # Use row._mapping to convert rows to dictionaries
+                    data = [dict(row._mapping) for row in result]
+                    return jsonify({"data": data})
+                else:
+                    session.commit()
+                    return jsonify({"message": "Query executed successfully."})
             except Exception as e:
                 logger.error(f"SQL query error: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -111,31 +116,53 @@ def manage_page():
     return render_template('manage.html', title="Manage Data")
 
 
-
-@app.route('/visualize', methods=['POST'])
+@app.route('/visualize', methods=['GET', 'POST'])
 def visualize_page():
-    print(f"Request method: {request.method}")  # Debug the method
-    data = request.json.get('data')
-    x_axis = request.json.get('x_axis')
-    y_axis = request.json.get('y_axis')
-    chart_type = request.json.get('chart_type', 'bar')
-    plot_path = 'static/plot.png'
+    if request.method == 'GET':
+        return render_template("visualize.html", message="Submit data using the form below.")
+
     try:
-        df = pd.DataFrame(data)
+        # Parse the request data
+        query = request.json.get('query')
+        x_axis = request.json.get('x_axis')
+        y_axis = request.json.get('y_axis')
+        chart_type = request.json.get('chart_type', 'bar')
+
+        if not query:
+            return jsonify({"error": "No query provided."}), 400
+
+        # Execute the SQL query
+        result = session.execute(text(query)).fetchall()
+        df = pd.DataFrame(result, columns=result[0].keys())
+
+        print("Received DataFrame:")
+        print(df.head())  # Debug the DataFrame content
+
+        # Validate that x_axis and y_axis exist in the DataFrame
+        if x_axis not in df.columns or y_axis not in df.columns:
+            return jsonify({"error": f"Columns '{x_axis}' and/or '{y_axis}' not found in the data."}), 400
+
+        # Generate the chart
+        plot_path = 'static/plot.png'
         if chart_type == 'bar':
             df.plot(kind='bar', x=x_axis, y=y_axis).get_figure().savefig(plot_path)
         elif chart_type == 'line':
             df.plot(kind='line', x=x_axis, y=y_axis).get_figure().savefig(plot_path)
         elif chart_type == 'scatter':
             df.plot(kind='scatter', x=x_axis, y=y_axis).get_figure().savefig(plot_path)
-        return jsonify({"message": "Visualization created.", "plot_url": plot_path})
+
+        return jsonify({"message": "Visualization created.", "plot_url": f"/{plot_path}"})
     except Exception as e:
+        print(f"Error during visualization: {e}")  # Log the exception
         return jsonify({"error": str(e)}), 500
 
-
-
-@app.route('/report', methods=['POST'])
+@app.route('/report', methods=['GET', 'POST'])
 def report_page():
+    if request.method == 'GET':
+        # Render a form or instructions for the report page
+        return render_template("report.html", message="Submit data using the form below.")
+
+    # Handle POST request
     data = request.json.get('data')
     report_path = 'static/report.csv'
     try:
