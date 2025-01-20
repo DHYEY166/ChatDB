@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="text-center">
+    <h1>Welcome to ChatDB</h1>
+    <p>Connect, manage, and visualize your databases effortlessly.</p>
+    <a href="{{ url_for('connect_page') }}" class="btn btn-primary mt-4">Get Started</a>
+</div>
+{% endblock %}
