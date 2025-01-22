@@ -3,41 +3,133 @@
 {% block content %}
 <h2>Manage Data</h2>
 
+<!-- File Upload Section -->
 <div class="mb-4">
-    <button id="list-sql-tables" class="btn btn-primary">List SQL Tables</button>
-    <button id="list-nosql-collections" class="btn btn-secondary">List NoSQL Collections</button>
+    <h4>Upload Data</h4>
+    <form id="upload-form" enctype="multipart/form-data">
+        <label for="file-type" class="form-label">File Type</label>
+        <select id="file-type" name="file_type" class="form-select">
+            <option value="csv">CSV</option>
+            <option value="json">JSON</option>
+        </select>
+
+        <label for="file-upload" class="form-label mt-3">Upload File</label>
+        <input type="file" id="file-upload" name="file" class="form-control">
+
+        <button type="submit" class="btn btn-primary mt-3">Upload</button>
+    </form>
+    <div id="upload-status" class="mt-3"></div>
 </div>
 
+<!-- Query Execution Section -->
 <div>
     <h4>Execute a Query</h4>
     <form id="query-form" class="mb-3">
-        <label for="db-type" class="form-label">Database Type</label>
-        <select id="db-type" class="form-select">
-            <option value="sql">SQL</option>
-            <option value="nosql">NoSQL</option>
-        </select>
-
         <label for="query" class="form-label mt-3">Query</label>
         <textarea id="query" class="form-control" rows="5" placeholder="Enter your query here"></textarea>
 
-        <label for="collection-name" class="form-label mt-3">Collection Name (for NoSQL)</label>
-        <input type="text" id="collection-name" class="form-control" placeholder="Enter collection name">
-
-        <button type="submit" class="btn btn-primary mt-3">Execute Query</button>
+        <button type="button" id="execute-query" class="btn btn-primary mt-3">Execute Query</button>
     </form>
 </div>
 
 <div>
     <h4>Data Output:</h4>
     <div id="data-output">
-        <!-- Title for JSON output -->
+        <!-- JSON Output -->
         <h5>JSON Output:</h5>
         <pre id="json-output"></pre>
 
-        <!-- Title for Tabular output -->
+        <!-- Tabular Output -->
         <h5>Tabular Output:</h5>
         <div id="table-output"></div>
     </div>
 </div>
 
+<script>
+    // Handle File Upload
+    const uploadForm = document.querySelector('#upload-form');
+    uploadForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        const formData = new FormData(uploadForm);
+
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.querySelector('#upload-status').textContent = data.message;
+        })
+        .catch(error => {
+            document.querySelector('#upload-status').textContent = `Error: ${error.message}`;
+        });
+    });
+
+    // Handle Query Execution
+    document.querySelector('#execute-query').addEventListener('click', function () {
+        const query = document.querySelector('#query').value;
+
+        // Construct payload for POST request
+        const payload = {
+            query: query,
+        };
+
+        fetch('/manage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                document.querySelector('#json-output').textContent = `Error: ${data.error}`;
+                document.querySelector('#table-output').innerHTML = '';
+            } else if (data.data) {
+                // Display JSON output
+                document.querySelector('#json-output').textContent = JSON.stringify(data.data, null, 2);
+
+                // Render tabular data if applicable
+                if (Array.isArray(data.data) && data.data.length > 0) {
+                    const table = document.createElement('table');
+                    table.className = "table table-bordered";
+                    const thead = document.createElement('thead');
+                    const tbody = document.createElement('tbody');
+
+                    // Add table headers
+                    const headerRow = document.createElement('tr');
+                    Object.keys(data.data[0]).forEach(key => {
+                        const th = document.createElement('th');
+                        th.textContent = key;
+                        headerRow.appendChild(th);
+                    });
+                    thead.appendChild(headerRow);
+
+                    // Add table rows
+                    data.data.forEach(row => {
+                        const rowElement = document.createElement('tr');
+                        Object.values(row).forEach(value => {
+                            const td = document.createElement('td');
+                            td.textContent = value;
+                            rowElement.appendChild(td);
+                        });
+                        tbody.appendChild(rowElement);
+                    });
+
+                    table.appendChild(thead);
+                    table.appendChild(tbody);
+                    document.querySelector('#table-output').innerHTML = '';
+                    document.querySelector('#table-output').appendChild(table);
+                } else {
+                    document.querySelector('#table-output').innerHTML = 'No tabular data available.';
+                }
+            } else if (data.message) {
+                document.querySelector('#json-output').textContent = data.message;
+                document.querySelector('#table-output').innerHTML = '';
+            }
+        })
+        .catch(error => {
+            document.querySelector('#json-output').textContent = `Error: ${error.message}`;
+        });
+    });
+</script>
 {% endblock %}
