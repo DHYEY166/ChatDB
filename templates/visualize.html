@@ -4,12 +4,6 @@
 <h2>Visualize Data</h2>
 
 <form id="visualize-form" method="POST">
-    <label for="db-type" class="form-label">Database Type</label>
-    <select id="db-type" name="db_type" class="form-select">
-        <option value="sql">SQL</option>
-        <option value="nosql">NoSQL</option>
-    </select>
-
     <label for="query" class="form-label mt-3">Query</label>
     <textarea id="query" name="query" class="form-control mb-3" rows="5" placeholder="Enter your query here"></textarea>
 
@@ -34,4 +28,3 @@
     <img id="chart" src="{{ url_for('static', filename='plot.png') }}" alt="Generated Chart" class="img-fluid">
 </div>
 {% endblock %}
-

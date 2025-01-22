@@ -1,12 +1,15 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session as flask_session
 from flask_sqlalchemy import SQLAlchemy
-from pymongo import MongoClient
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 import pandas as pd
 import os
 import openai
 import logging
+import matplotlib
+import matplotlib.pyplot as plt
+import sqlite3
+matplotlib.use('Agg')
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -25,12 +28,12 @@ db = SQLAlchemy(app)
 # Setup SQLAlchemy session
 with app.app_context():
     engine = db.engine
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    SQLAlchemySession = sessionmaker(bind=engine)
+    sqlalchemy_session = SQLAlchemySession()
 
-# MongoDB Configuration
-mongo_client = None
-mongo_db = None
+# Flask session for storing query results
+app.secret_key = "supersecretkey"
+app.config['SESSION_TYPE'] = 'filesystem'
 
 # OpenAI API Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -55,114 +58,142 @@ def index():
 @app.route('/connect', methods=['GET', 'POST'])
 def connect_page():
     if request.method == 'POST':
-        db_type = request.json.get('db_type')  # 'sql' or 'nosql'
-        if db_type == 'sql':
-            db_uri = request.json.get('db_uri')
-            if not db_uri:
-                return jsonify({"error": "SQL Database URI is required."}), 400
-            try:
-                app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
-                db.engine.dispose()  # Close existing connections
-                with app.app_context():
-                    db.create_all()
-                return jsonify({"message": f"Connected to SQL database: {db_uri}"})
-            except Exception as e:
-                logger.error(f"Error connecting to SQL: {e}")
-                return jsonify({"error": str(e)}), 500
-        elif db_type == 'nosql':
-            mongo_uri = request.json.get('mongo_uri')
-            db_name = request.json.get('db_name')
-            if not mongo_uri or not db_name:
-                return jsonify({"error": "MongoDB URI and database name are required."}), 400
-            try:
-                global mongo_client, mongo_db
-                mongo_client = MongoClient(mongo_uri)
-                mongo_db = mongo_client[db_name]
-                return jsonify({"message": f"Connected to MongoDB database: {db_name}"})
-            except Exception as e:
-                logger.error(f"Error connecting to MongoDB: {e}")
-                return jsonify({"error": str(e)}), 500
+        db_uri = request.json.get('db_uri')
+        if not db_uri:
+            return jsonify({"error": "SQL Database URI is required."}), 400
+        try:
+            app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+            db.engine.dispose()  # Close existing connections
+            with app.app_context():
+                db.create_all()
+            return jsonify({"message": f"Connected to SQL database: {db_uri}"})
+        except Exception as e:
+            logger.error(f"Error connecting to SQL: {e}")
+            return jsonify({"error": str(e)}), 500
     return render_template('connect.html', title="Connect to Database")
 
 @app.route('/manage', methods=['GET', 'POST'])
 def manage_page():
     if request.method == 'POST':
-        db_type = request.json.get('db_type')
         query = request.json.get('query')
-        if db_type == 'sql':
-            try:
-                result = session.execute(text(query)).fetchall()
-                if result:
-                    # Use row._mapping to convert rows to dictionaries
-                    data = [dict(row._mapping) for row in result]
-                    return jsonify({"data": data})
-                else:
-                    session.commit()
-                    return jsonify({"message": "Query executed successfully."})
-            except Exception as e:
-                logger.error(f"SQL query error: {e}")
-                return jsonify({"error": str(e)}), 500
-        elif db_type == 'nosql':
-            collection_name = request.json.get('collection_name')
-            if not collection_name:
-                return jsonify({"error": "Collection name is required for NoSQL queries."}), 400
-            try:
-                collection = mongo_db[collection_name]
-                data = list(collection.find(query))
+        try:
+            # Execute the query using SQLAlchemy session
+            if query.strip().lower().startswith("select"):
+                result = sqlalchemy_session.execute(text(query)).fetchall()
+                # Convert rows to dictionaries
+                data = [dict(row._mapping) for row in result]
+                # Save query results in Flask session
+                flask_session['query_results'] = data
                 return jsonify({"data": data})
-            except Exception as e:
-                logger.error(f"NoSQL query error: {e}")
-                return jsonify({"error": str(e)}), 500
+            else:
+                sqlalchemy_session.execute(text(query))
+                sqlalchemy_session.commit()
+                return jsonify({"message": "Query executed successfully."})
+        except Exception as e:
+            logger.error(f"SQL query error: {e}")
+            return jsonify({"error": str(e)}), 500
     return render_template('manage.html', title="Manage Data")
 
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    UPLOAD_FOLDER = 'uploads'
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    if 'file' not in request.files:
+        return jsonify({"message": "No file part"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"message": "No selected file"}), 400
+
+    file_type = request.form.get('file_type')
+    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(file_path)
+
+    try:
+        if file_type == 'csv':
+            df = pd.read_csv(file_path)
+        elif file_type == 'json':
+            df = pd.read_json(file_path)
+        else:
+            return jsonify({"message": "Unsupported file type"}), 400
+
+        # Insert data into SQLite using dynamic column mapping
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        for record in df.to_dict(orient='records'):
+            columns = ", ".join(record.keys())
+            placeholders = ", ".join("?" * len(record))
+            sql = f"INSERT INTO uploaded_data ({columns}) VALUES ({placeholders})"
+
+            try:
+                cursor.execute(sql, tuple(record.values()))
+            except sqlite3.OperationalError as e:
+                logger.error(f"Error inserting record: {e}")
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "File uploaded and data inserted successfully!"})
+    except Exception as e:
+        return jsonify({"message": f"Error processing file: {e}"}), 500
+    finally:
+        os.remove(file_path)
 
 @app.route('/visualize', methods=['GET', 'POST'])
 def visualize_page():
     if request.method == 'GET':
-        return render_template("visualize.html", message="Submit data using the form below.")
+        data = flask_session.get('query_results', None)
+        if not data:
+            return "No data available to visualize", 400
+        return render_template("visualize.html", data=data)
 
     try:
-        # Parse the request data
-        query = request.json.get('query')
         x_axis = request.json.get('x_axis')
         y_axis = request.json.get('y_axis')
         chart_type = request.json.get('chart_type', 'bar')
 
-        if not query:
-            return jsonify({"error": "No query provided."}), 400
+        data = flask_session.get('query_results', None)
+        if not data:
+            return jsonify({"error": "No data available for visualization"}), 400
 
-        # Execute the SQL query
-        result = session.execute(text(query)).fetchall()
-        df = pd.DataFrame(result, columns=result[0].keys())
+        df = pd.DataFrame(data)
 
-        print("Received DataFrame:")
-        print(df.head())  # Debug the DataFrame content
-
-        # Validate that x_axis and y_axis exist in the DataFrame
         if x_axis not in df.columns or y_axis not in df.columns:
             return jsonify({"error": f"Columns '{x_axis}' and/or '{y_axis}' not found in the data."}), 400
 
-        # Generate the chart
         plot_path = 'static/plot.png'
-        if chart_type == 'bar':
-            df.plot(kind='bar', x=x_axis, y=y_axis).get_figure().savefig(plot_path)
-        elif chart_type == 'line':
-            df.plot(kind='line', x=x_axis, y=y_axis).get_figure().savefig(plot_path)
-        elif chart_type == 'scatter':
-            df.plot(kind='scatter', x=x_axis, y=y_axis).get_figure().savefig(plot_path)
+        plt.figure(figsize=(12, 6))  # Increase the figure size
 
-        return jsonify({"message": "Visualization created.", "plot_url": f"/{plot_path}"})
+        if chart_type == "line":
+            plt.plot(df[x_axis], df[y_axis], label=y_axis)
+        elif chart_type == "bar":
+            plt.bar(df[x_axis], df[y_axis], label=y_axis)
+        elif chart_type == "scatter":
+            plt.scatter(df[x_axis], df[y_axis], label=y_axis)
+        else:
+            return jsonify({"error": f"Chart type '{chart_type}' is not supported."}), 400
+
+        plt.xlabel(x_axis)
+        plt.ylabel(y_axis)
+        plt.xticks(rotation=45, ha="right")  # Rotate x-axis labels for better readability
+        plt.title(f"{chart_type.capitalize()} Chart of {y_axis} vs {x_axis}")
+        plt.legend()
+
+        plt.tight_layout()  # Adjust layout to avoid clipping labels
+        plt.savefig(plot_path)  # Save the plot as an image
+        plt.close()
+
+        return jsonify({"message": "Visualization created successfully.", "plot_url": f"/{plot_path}"})
     except Exception as e:
-        print(f"Error during visualization: {e}")  # Log the exception
+        logger.error(f"Visualization error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/report', methods=['GET', 'POST'])
 def report_page():
     if request.method == 'GET':
-        # Render a form or instructions for the report page
         return render_template("report.html", message="Submit data using the form below.")
 
-    # Handle POST request
     data = request.json.get('data')
     report_path = 'static/report.csv'
     try:

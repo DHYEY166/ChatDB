@@ -24,33 +24,6 @@ document.getElementById("connect-sql-form")?.addEventListener("submit", async (e
     }
 });
 
-// Connect to NoSQL Database
-document.getElementById("connect-nosql-form")?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const mongoUri = document.getElementById("mongo-uri").value;
-    const dbName = document.getElementById("db-name").value;
-
-    try {
-        const res = await fetch("/connect", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ db_type: "nosql", mongo_uri: mongoUri, db_name: dbName }),
-        });
-        const result = await res.json();
-
-        const output = document.getElementById("connection-output");
-        if (result.message) {
-            output.textContent = `Success: ${result.message}`;
-            output.style.color = "green";
-        } else {
-            output.textContent = `Error: ${result.error}`;
-            output.style.color = "red";
-        }
-    } catch (error) {
-        alert("An error occurred while connecting to the NoSQL database.");
-    }
-});
-
 // List SQL Tables
 document.getElementById("list-sql-tables")?.addEventListener("click", async () => {
     try {
@@ -66,32 +39,12 @@ document.getElementById("list-sql-tables")?.addEventListener("click", async () =
     }
 });
 
-// List NoSQL Collections
-document.getElementById("list-nosql-collections")?.addEventListener("click", async () => {
-    try {
-        const res = await fetch("/manage", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ db_type: "nosql" }),
-        });
-        const result = await res.json();
-        document.getElementById("data-output").textContent = JSON.stringify(result.collections || result.error, null, 2);
-    } catch (error) {
-        alert("An error occurred while listing NoSQL collections.");
-    }
-});
-
 // Execute Query
 document.getElementById("query-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const dbType = document.getElementById("db-type").value;
     const query = document.getElementById("query").value;
-    const collectionName = document.getElementById("collection-name").value;
 
-    const payload = { db_type: dbType, query };
-    if (dbType === "nosql" && collectionName) {
-        payload.collection_name = collectionName;
-    }
+    const payload = { db_type: "sql", query };
 
     try {
         const res = await fetch("/manage", {
@@ -168,21 +121,17 @@ document.getElementById("query-form")?.addEventListener("submit", async (e) => {
     }
 });
 
-
-
-
 // Generate Visualization
 document.getElementById("visualize-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const dbType = document.getElementById("db-type").value;
     const query = document.getElementById("query").value;
     const xAxis = document.getElementById("x-axis").value;
     const yAxis = document.getElementById("y-axis").value;
     const chartType = document.getElementById("chart-type").value;
 
     const payload = {
-        db_type: dbType,
+        db_type: "sql",
         query,
         x_axis: xAxis,
         y_axis: yAxis,
@@ -198,7 +147,9 @@ document.getElementById("visualize-form")?.addEventListener("submit", async (e) 
 
         const result = await res.json();
         if (result.plot_url) {
-            document.getElementById("chart").src = result.plot_url;
+            // Append a timestamp to avoid caching issues
+            const chartElement = document.getElementById("chart");
+            chartElement.src = `${result.plot_url}?t=${new Date().getTime()}`;
         } else {
             alert(result.error || "An error occurred while generating the visualization.");
         }
@@ -206,8 +157,6 @@ document.getElementById("visualize-form")?.addEventListener("submit", async (e) 
         alert("An error occurred while generating the visualization.");
     }
 });
-
-
 
 
 // Generate Report
