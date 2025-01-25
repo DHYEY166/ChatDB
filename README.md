@@ -2,7 +2,7 @@
 
 **ChatDB** is an interactive, web-based application that simplifies database management and visualization. With ChatDB, you can easily connect to a database, manage data, execute queries, generate reports, and visualize results using an intuitive interface.
 
-[Explore ChatDB Online](https://chatdb-app-b12810368b1f.herokuapp.com/)
+[Explore ChatDB Online](https://chatdb-application-2ca5a3886d1a.herokuapp.com/)
 
 ---
 
