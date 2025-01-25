@@ -163,48 +163,57 @@ def upload_file():
 @app.route('/visualize', methods=['GET', 'POST'])
 def visualize_page():
     if request.method == 'GET':
-        data = flask_session.get('query_results', None)
-        if not data:
-            return "No data available to visualize", 400
-        return render_template("visualize.html", data=data)
-
+        return render_template("visualize.html")
+    
     try:
+        query = request.json.get('query')
         x_axis = request.json.get('x_axis')
         y_axis = request.json.get('y_axis')
         chart_type = request.json.get('chart_type', 'bar')
+        
+        with app.app_context():
+            result = db.session.execute(text(query))
+            rows = result.fetchall()
+            if not rows:
+                return jsonify({"error": "No data returned from query"}), 404
 
-        data = flask_session.get('query_results', None)
-        if not data:
-            return jsonify({"error": "No data available for visualization"}), 400
+            df = pd.DataFrame(rows)
+            df.columns = result.keys()
 
-        df = pd.DataFrame(data)
+            plt.figure(figsize=(15, 8))
 
-        if x_axis not in df.columns or y_axis not in df.columns:
-            return jsonify({"error": f"Columns '{x_axis}' and/or '{y_axis}' not found in the data."}), 400
+            if df[x_axis].dtype == 'object':
+                x_values = range(len(df[x_axis]))
+                if chart_type == "scatter":
+                    plt.scatter(x_values, df[y_axis])
+                elif chart_type == "line":
+                    plt.plot(x_values, df[y_axis])
+                else:  # bar chart
+                    plt.bar(x_values, df[y_axis])
+                plt.xticks(x_values, df[x_axis], rotation=45, ha='right')
+            else:
+                if chart_type == "scatter":
+                    plt.scatter(df[x_axis], df[y_axis])
+                elif chart_type == "line":
+                    plt.plot(df[x_axis], df[y_axis])
+                else:  # bar chart
+                    plt.bar(df[x_axis], df[y_axis])
 
-        plot_path = 'static/plot.png'
-        plt.figure(figsize=(12, 6))  # Increase the figure size
+            plt.xlabel(x_axis)
+            plt.ylabel(y_axis)
+            plt.title(f"{chart_type.capitalize()} Chart of {y_axis} vs {x_axis}")
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
 
-        if chart_type == "line":
-            plt.plot(df[x_axis], df[y_axis], label=y_axis)
-        elif chart_type == "bar":
-            plt.bar(df[x_axis], df[y_axis], label=y_axis)
-        elif chart_type == "scatter":
-            plt.scatter(df[x_axis], df[y_axis], label=y_axis)
-        else:
-            return jsonify({"error": f"Chart type '{chart_type}' is not supported."}), 400
+            plot_path = 'static/plot.png'
+            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            plt.close()
 
-        plt.xlabel(x_axis)
-        plt.ylabel(y_axis)
-        plt.xticks(rotation=45, ha="right")  # Rotate x-axis labels for better readability
-        plt.title(f"{chart_type.capitalize()} Chart of {y_axis} vs {x_axis}")
-        plt.legend()
-
-        plt.tight_layout()  # Adjust layout to avoid clipping labels
-        plt.savefig(plot_path)  # Save the plot as an image
-        plt.close()
-
-        return jsonify({"message": "Visualization created successfully.", "plot_url": f"/{plot_path}"})
+            return jsonify({
+                "message": "Visualization created successfully",
+                "plot_url": f"/{plot_path}"
+            })
+            
     except Exception as e:
         logger.error(f"Visualization error: {e}")
         return jsonify({"error": str(e)}), 500
@@ -226,9 +235,6 @@ def report_page():
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-    app.run(host='0.0.0.0', port=5000, debug=True)
-
-    
-
-
+        db.create_all()  # Optional: Initializes your database
+    port = int(os.environ.get('PORT', 5000))  # Heroku provides the PORT environment variable
+    app.run(host='0.0.0.0', port=port)

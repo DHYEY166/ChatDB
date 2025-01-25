@@ -124,40 +124,41 @@ document.getElementById("query-form")?.addEventListener("submit", async (e) => {
 // Generate Visualization
 document.getElementById("visualize-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-
-    const query = document.getElementById("query").value;
-    const xAxis = document.getElementById("x-axis").value;
-    const yAxis = document.getElementById("y-axis").value;
-    const chartType = document.getElementById("chart-type").value;
-
-    const payload = {
-        db_type: "sql",
-        query,
-        x_axis: xAxis,
-        y_axis: yAxis,
-        chart_type: chartType,
+    const chartContainer = document.getElementById('chart-container');
+    const errorMessage = document.getElementById('error-message');
+    
+    const formData = {
+        query: document.getElementById('query').value,
+        x_axis: document.getElementById('x-axis').value,
+        y_axis: document.getElementById('y-axis').value,
+        chart_type: document.getElementById('chart-type').value
     };
 
     try {
-        const res = await fetch("/visualize", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+        const response = await fetch('/visualize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
         });
 
-        const result = await res.json();
-        if (result.plot_url) {
-            // Append a timestamp to avoid caching issues
-            const chartElement = document.getElementById("chart");
-            chartElement.src = `${result.plot_url}?t=${new Date().getTime()}`;
+        const result = await response.json();
+        
+        if (result.error) {
+            errorMessage.textContent = result.error;
+            errorMessage.classList.remove('d-none');
+            document.getElementById('chart').classList.add('d-none');
         } else {
-            alert(result.error || "An error occurred while generating the visualization.");
+            errorMessage.classList.add('d-none');
+            const chartImg = document.getElementById('chart');
+            chartImg.src = `${result.plot_url}?t=${new Date().getTime()}`;
+            chartImg.classList.remove('d-none');
         }
     } catch (error) {
-        alert("An error occurred while generating the visualization.");
+        errorMessage.textContent = 'Error generating visualization';
+        errorMessage.classList.remove('d-none');
+        document.getElementById('chart').classList.add('d-none');
     }
 });
-
 
 // Generate Report
 document.getElementById("report-form")?.addEventListener("submit", async (e) => {
