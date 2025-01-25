@@ -8,7 +8,6 @@ import openai
 import logging
 import matplotlib
 import matplotlib.pyplot as plt
-import sqlite3
 matplotlib.use('Agg')
 
 # Initialize Flask app
@@ -77,20 +76,20 @@ def manage_page():
     if request.method == 'POST':
         query = request.json.get('query')
         try:
-            # Execute the query using SQLAlchemy session
-            if query.strip().lower().startswith("select"):
-                result = sqlalchemy_session.execute(text(query)).fetchall()
-                # Convert rows to dictionaries
-                data = [dict(row._mapping) for row in result]
-                # Save query results in Flask session
-                flask_session['query_results'] = data
-                return jsonify({"data": data})
-            else:
-                sqlalchemy_session.execute(text(query))
-                sqlalchemy_session.commit()
-                return jsonify({"message": "Query executed successfully."})
+            with app.app_context():
+                # Execute the query using SQLAlchemy session
+                if query.strip().lower().startswith("select"):
+                    result = db.session.execute(text(query))
+                    # Convert results to list of dicts
+                    columns = result.keys()
+                    rows = [dict(zip(columns, row)) for row in result]
+                    return jsonify({"data": rows})
+                else:
+                    db.session.execute(text(query))
+                    db.session.commit()
+                    return jsonify({"message": "Query executed successfully."})
         except Exception as e:
-            logger.error(f"SQL query error: {e}")
+            db.session.rollback()
             return jsonify({"error": str(e)}), 500
     return render_template('manage.html', title="Manage Data")
 
@@ -98,6 +97,7 @@ def manage_page():
 def upload_file():
     UPLOAD_FOLDER = 'uploads'
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    
     if 'file' not in request.files:
         return jsonify({"message": "No file part"}), 400
 
@@ -105,40 +105,60 @@ def upload_file():
     if file.filename == '':
         return jsonify({"message": "No selected file"}), 400
 
-    file_type = request.form.get('file_type')
+    table_name = os.path.splitext(file.filename)[0].lower()
+    table_name = ''.join(c if c.isalnum() else '_' for c in table_name)
+    if table_name[0].isdigit():
+        table_name = 'f_' + table_name
+
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(file_path)
 
     try:
-        if file_type == 'csv':
-            df = pd.read_csv(file_path)
-        elif file_type == 'json':
-            df = pd.read_json(file_path)
+        if request.form.get('file_type') == 'json':
+            import json
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+
+            def flatten_json(data):
+                flattened = []
+                for item in data:
+                    flat_item = {}
+                    for key, value in item.items():
+                        if isinstance(value, dict):
+                            # Extract important fields from nested dict
+                            for nested_key, nested_value in value.items():
+                                if isinstance(nested_value, (str, int, float, bool)):
+                                    flat_item[f"{key}_{nested_key}"] = nested_value
+                        elif isinstance(value, list):
+                            # Convert lists to string representation
+                            flat_item[key] = json.dumps(value)
+                        else:
+                            flat_item[key] = value
+                    flattened.append(flat_item)
+                return flattened
+
+            flattened_data = flatten_json(data if isinstance(data, list) else [data])
+            df = pd.DataFrame(flattened_data)
         else:
-            return jsonify({"message": "Unsupported file type"}), 400
+            df = pd.read_csv(file_path)
 
-        # Insert data into SQLite using dynamic column mapping
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        with app.app_context():
+            inspector = db.inspect(db.engine)
+            if table_name in inspector.get_table_names():
+                db.session.execute(text(f'DROP TABLE IF EXISTS {table_name}'))
+                db.session.commit()
 
-        for record in df.to_dict(orient='records'):
-            columns = ", ".join(record.keys())
-            placeholders = ", ".join("?" * len(record))
-            sql = f"INSERT INTO uploaded_data ({columns}) VALUES ({placeholders})"
-
-            try:
-                cursor.execute(sql, tuple(record.values()))
-            except sqlite3.OperationalError as e:
-                logger.error(f"Error inserting record: {e}")
-
-        conn.commit()
-        conn.close()
-
-        return jsonify({"message": "File uploaded and data inserted successfully!"})
+        df.to_sql(table_name, db.engine, index=False, if_exists='replace')
+        return jsonify({
+            "message": f"File uploaded successfully as table '{table_name}'",
+            "table_name": table_name,
+            "columns": list(df.columns)
+        })
     except Exception as e:
-        return jsonify({"message": f"Error processing file: {e}"}), 500
+        return jsonify({"message": f"Error processing file: {str(e)}"}), 500
     finally:
-        os.remove(file_path)
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
 @app.route('/visualize', methods=['GET', 'POST'])
 def visualize_page():
