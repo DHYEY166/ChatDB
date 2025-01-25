@@ -35,13 +35,13 @@
 <div>
     <h4>Data Output:</h4>
     <div id="data-output">
-        <!-- JSON Output -->
-        <h5>JSON Output:</h5>
-        <pre id="json-output"></pre>
-
         <!-- Tabular Output -->
         <h5>Tabular Output:</h5>
         <div id="table-output"></div>
+
+        <!-- JSON Output -->
+        <h5>JSON Output:</h5>
+        <pre id="json-output"></pre>
     </div>
 </div>
 
@@ -68,11 +68,7 @@
     // Handle Query Execution
     document.querySelector('#execute-query').addEventListener('click', function () {
         const query = document.querySelector('#query').value;
-
-        // Construct payload for POST request
-        const payload = {
-            query: query,
-        };
+        const payload = { query: query };
 
         fetch('/manage', {
             method: 'POST',
@@ -82,16 +78,13 @@
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                document.querySelector('#json-output').textContent = `Error: ${data.error}`;
                 document.querySelector('#table-output').innerHTML = '';
+                document.querySelector('#json-output').textContent = `Error: ${data.error}`;
             } else if (data.data) {
-                // Display JSON output
-                document.querySelector('#json-output').textContent = JSON.stringify(data.data, null, 2);
-
                 // Render tabular data if applicable
                 if (Array.isArray(data.data) && data.data.length > 0) {
                     const table = document.createElement('table');
-                    table.className = "table table-bordered";
+                    table.className = "table table-bordered table-striped";
                     const thead = document.createElement('thead');
                     const tbody = document.createElement('tbody');
 
@@ -122,12 +115,16 @@
                 } else {
                     document.querySelector('#table-output').innerHTML = 'No tabular data available.';
                 }
+
+                // Display JSON output
+                document.querySelector('#json-output').textContent = JSON.stringify(data.data, null, 2);
             } else if (data.message) {
-                document.querySelector('#json-output').textContent = data.message;
                 document.querySelector('#table-output').innerHTML = '';
+                document.querySelector('#json-output').textContent = data.message;
             }
         })
         .catch(error => {
+            document.querySelector('#table-output').innerHTML = '';
             document.querySelector('#json-output').textContent = `Error: ${error.message}`;
         });
     });
