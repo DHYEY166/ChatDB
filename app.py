@@ -22,7 +22,6 @@ app = Flask(__name__)
 
 # Security improvements
 app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(32))
-app.config['SESSION_TYPE'] = 'filesystem'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 
 # Configure the SQLite database - use /tmp for Render (writable location)
@@ -944,6 +943,37 @@ def check_users():
         
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/session-test')
+def session_test():
+    """Test session functionality"""
+    try:
+        # Test session write
+        flask_session['test_key'] = 'test_value'
+        
+        # Test session read
+        test_value = flask_session.get('test_key')
+        
+        # Clean up
+        flask_session.pop('test_key', None)
+        
+        if test_value == 'test_value':
+            return jsonify({
+                "status": "success",
+                "message": "Session is working correctly",
+                "session_id": flask_session.get('_id', 'No session ID')
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "Session read/write test failed"
+            })
+            
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        })
 
 @app.errorhandler(404)
 def not_found_error(error):
