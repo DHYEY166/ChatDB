@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">Query History</h2>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Your Query History</h5>
+            <div>
+                <button class="btn btn-sm btn-outline-secondary" onclick="exportHistory()">
+                    <i class="fas fa-download me-1"></i>Export
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if history.items %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Query</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Execution Time</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for query in history.items %}
+                        <tr>
+                            <td>
+                                <code class="text-truncate d-inline-block" style="max-width: 300px;" title="{{ query.query }}">
+                                    {{ query.query[:80] }}{% if query.query|length > 80 %}...{% endif %}
+                                </code>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 'primary' if query.query_type == 'select' else 'warning' if query.query_type == 'modify' else 'secondary' }}">
+                                    {{ query.query_type }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if query.success %}
+                                    <span class="badge bg-success">Success</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Failed</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if query.execution_time %}
+                                    <span class="text-muted">{{ "%.3f"|format(query.execution_time) }}s</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ query.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="copyQuery('{{ query.query|replace("'", "\\'") }}')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                                {% if not query.success and query.error_message %}
+                                    <button class="btn btn-sm btn-outline-info" onclick="showError('{{ query.error_message|replace("'", "\\'") }}')">
+                                        <i class="fas fa-info-circle"></i>
+                                    </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <nav aria-label="Query history pagination">
+                <ul class="pagination justify-content-center">
+                    {% if history.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('query_history', page=history.prev_num) }}">Previous</a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for page_num in history.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != history.page %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('query_history', page=page_num) }}">{{ page_num }}</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if history.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('query_history', page=history.next_num) }}">Next</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No query history found</h5>
+                <p class="text-muted">Start using the application to see your query history here.</p>
+                <a href="{{ url_for('manage_page') }}" class="btn btn-primary">Go to Manage Data</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Error Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="errorMessage" class="bg-light p-3 rounded"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyQuery(query) {
+    navigator.clipboard.writeText(query).then(function() {
+        // Show success message
+        const toast = document.createElement('div');
+        toast.className = 'toast position-fixed top-0 end-0 m-3';
+        toast.style.zIndex = '9999';
+        toast.innerHTML = `
+            <div class="toast-header bg-success text-white">
+                <strong class="me-auto">Success</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                Query copied to clipboard!
+            </div>
+        `;
+        document.body.appendChild(toast);
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+        
+        setTimeout(() => {
+            document.body.removeChild(toast);
+        }, 3000);
+    });
+}
+
+function showError(errorMessage) {
+    document.getElementById('errorMessage').textContent = errorMessage;
+    const modal = new bootstrap.Modal(document.getElementById('errorModal'));
+    modal.show();
+}
+
+function exportHistory() {
+    // Create CSV content
+    const table = document.querySelector('table');
+    const rows = Array.from(table.querySelectorAll('tr'));
+    const csvContent = rows.map(row => {
+        return Array.from(row.querySelectorAll('td, th'))
+            .map(cell => `"${cell.textContent.trim()}"`)
+            .join(',');
+    }).join('\n');
+    
+    // Download CSV file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'query_history.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+</script>
+{% endblock %} 

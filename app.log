@@ -1,0 +1,21 @@
+2025-07-27 01:31:38,133 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.234:5000
+2025-07-27 01:31:38,133 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-07-27 01:31:46,106 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:46] "GET / HTTP/1.1" 200 -
+2025-07-27 01:31:46,242 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:46] "GET /static/js/scripts.js HTTP/1.1" 200 -
+2025-07-27 01:31:46,243 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:46] "GET /static/css/styles.css HTTP/1.1" 200 -
+2025-07-27 01:31:48,559 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:48] "GET /login HTTP/1.1" 200 -
+2025-07-27 01:31:48,581 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:48] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-07-27 01:31:48,582 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:48] "[36mGET /static/js/scripts.js HTTP/1.1[0m" 304 -
+2025-07-27 01:31:52,733 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:52] "GET /register HTTP/1.1" 200 -
+2025-07-27 01:31:52,755 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:52] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-07-27 01:31:52,755 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:52] "[36mGET /static/js/scripts.js HTTP/1.1[0m" 304 -
+2025-07-27 01:31:56,098 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:56] "GET / HTTP/1.1" 200 -
+2025-07-27 01:31:56,130 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:56] "[36mGET /static/js/scripts.js HTTP/1.1[0m" 304 -
+2025-07-27 01:31:56,135 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:31:56] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-07-27 01:32:10,387 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:32:10] "GET / HTTP/1.1" 200 -
+2025-07-27 01:33:11,020 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:33:11] "GET /register HTTP/1.1" 200 -
+2025-07-27 01:33:11,046 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:33:11] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-07-27 01:33:11,049 - werkzeug - INFO - 127.0.0.1 - - [27/Jul/2025 01:33:11] "[36mGET /static/js/scripts.js HTTP/1.1[0m" 304 -

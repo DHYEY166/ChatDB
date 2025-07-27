@@ -1,132 +1,328 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Manage Data</h2>
-
-<!-- File Upload Section -->
-<div class="mb-4">
-    <h4>Upload Data</h4>
-    <form id="upload-form" enctype="multipart/form-data">
-        <label for="file-type" class="form-label">File Type</label>
-        <select id="file-type" name="file_type" class="form-select">
-            <option value="csv">CSV</option>
-            <option value="json">JSON</option>
-        </select>
-
-        <label for="file-upload" class="form-label mt-3">Upload File</label>
-        <input type="file" id="file-upload" name="file" class="form-control">
-
-        <button type="submit" class="btn btn-primary mt-3">Upload</button>
-    </form>
-    <div id="upload-status" class="mt-3"></div>
-</div>
-
-<!-- Query Execution Section -->
-<div>
-    <h4>Execute a Query</h4>
-    <form id="query-form" class="mb-3">
-        <label for="query" class="form-label mt-3">Query</label>
-        <textarea id="query" class="form-control" rows="5" placeholder="Enter your query here"></textarea>
-
-        <button type="button" id="execute-query" class="btn btn-primary mt-3">Execute Query</button>
-    </form>
-</div>
-
-<div>
-    <h4>Data Output:</h4>
-    <div id="data-output">
-        <!-- Tabular Output -->
-        <h5>Tabular Output:</h5>
-        <div id="table-output"></div>
-
-        <!-- JSON Output -->
-        <h5>JSON Output:</h5>
-        <pre id="json-output"></pre>
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">Manage Data</h2>
     </div>
 </div>
 
+<!-- File Upload Section -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Upload Data</h5>
+    </div>
+    <div class="card-body">
+        <form id="upload-form" enctype="multipart/form-data">
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="file-type" class="form-label">File Type</label>
+                    <select id="file-type" name="file_type" class="form-select">
+                        <option value="csv">CSV</option>
+                        <option value="json">JSON</option>
+                        <option value="excel">Excel</option>
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label for="file-upload" class="form-label">Upload File</label>
+                    <input type="file" id="file-upload" name="file" class="form-control" accept=".csv,.json,.xlsx,.xls">
+                    <div class="form-text">Supported formats: CSV, JSON, Excel (.xlsx, .xls)</div>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">
+                <i class="fas fa-upload me-2"></i>Upload
+            </button>
+        </form>
+        <div id="upload-status" class="mt-3"></div>
+    </div>
+</div>
+
+<!-- Query Execution Section -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-code me-2"></i>Execute Query</h5>
+    </div>
+    <div class="card-body">
+        <form id="query-form" class="mb-3">
+            <div class="mb-3">
+                <label for="query" class="form-label">SQL Query</label>
+                <textarea id="query" class="form-control" rows="5" placeholder="Enter your SQL query here..."></textarea>
+                <div class="form-text">Only SELECT queries are allowed for security reasons.</div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" id="execute-query" class="btn btn-primary">
+                    <i class="fas fa-play me-2"></i>Execute Query
+                </button>
+                <button type="button" id="ai-suggest" class="btn btn-outline-info">
+                    <i class="fas fa-robot me-2"></i>AI Suggestion
+                </button>
+                <button type="button" id="clear-query" class="btn btn-outline-secondary">
+                    <i class="fas fa-eraser me-2"></i>Clear
+                </button>
+            </div>
+        </form>
+        
+        <!-- AI Suggestion Display -->
+        <div id="ai-suggestion" class="alert alert-info d-none">
+            <h6><i class="fas fa-lightbulb me-2"></i>AI Suggestion</h6>
+            <p id="suggestion-text"></p>
+            <button type="button" class="btn btn-sm btn-outline-info" onclick="applySuggestion()">
+                <i class="fas fa-check me-1"></i>Apply Suggestion
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Data Output Section -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-table me-2"></i>Data Output</h5>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="outputTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="table-tab" data-bs-toggle="tab" data-bs-target="#table-output" type="button" role="tab">
+                    <i class="fas fa-table me-1"></i>Table View
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json-output" type="button" role="tab">
+                    <i class="fas fa-code me-1"></i>JSON View
+                </button>
+            </li>
+        </ul>
+        <div class="tab-content mt-3" id="outputTabsContent">
+            <div class="tab-pane fade show active" id="table-output" role="tabpanel">
+                <div id="table-container"></div>
+            </div>
+            <div class="tab-pane fade" id="json-output" role="tabpanel">
+                <pre id="json-display" class="bg-light p-3 rounded"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Query History Section -->
+{% if history %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Queries</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Query</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for query in history %}
+                    <tr>
+                        <td>
+                            <code class="text-truncate d-inline-block" style="max-width: 200px;" title="{{ query.query }}">
+                                {{ query.query[:50] }}{% if query.query|length > 50 %}...{% endif %}
+                            </code>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'primary' if query.query_type == 'select' else 'warning' }}">
+                                {{ query.query_type }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if query.success %}
+                                <span class="badge bg-success">Success</span>
+                            {% else %}
+                                <span class="badge bg-danger">Failed</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ query.created_at.strftime('%H:%M') }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="loadQuery('{{ query.query|replace("'", "\\'") }}')">
+                                <i class="fas fa-arrow-up"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
-    // Handle File Upload
-    const uploadForm = document.querySelector('#upload-form');
-    uploadForm.addEventListener('submit', function (event) {
-        event.preventDefault();
-        const formData = new FormData(uploadForm);
+// Handle File Upload
+const uploadForm = document.querySelector('#upload-form');
+uploadForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    const formData = new FormData(uploadForm);
+    const statusDiv = document.querySelector('#upload-status');
+    
+    statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i>Uploading...</div>';
 
-        fetch('/upload', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            document.querySelector('#upload-status').textContent = data.message;
-        })
-        .catch(error => {
-            document.querySelector('#upload-status').textContent = `Error: ${error.message}`;
-        });
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            statusDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>${data.error}</div>`;
+        } else {
+            statusDiv.innerHTML = `<div class="alert alert-success"><i class="fas fa-check me-2"></i>${data.message}</div>`;
+            uploadForm.reset();
+        }
+    })
+    .catch(error => {
+        statusDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: ${error.message}</div>`;
     });
+});
 
-    // Handle Query Execution
-    document.querySelector('#execute-query').addEventListener('click', function () {
-        const query = document.querySelector('#query').value;
-        const payload = { query: query };
+// Handle Query Execution
+document.querySelector('#execute-query').addEventListener('click', function () {
+    const query = document.querySelector('#query').value;
+    if (!query.trim()) {
+        alert('Please enter a query');
+        return;
+    }
+    
+    const payload = { query: query };
+    executeQuery(payload);
+});
 
-        fetch('/manage', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                document.querySelector('#table-output').innerHTML = '';
-                document.querySelector('#json-output').textContent = `Error: ${data.error}`;
-            } else if (data.data) {
-                // Render tabular data if applicable
-                if (Array.isArray(data.data) && data.data.length > 0) {
-                    const table = document.createElement('table');
-                    table.className = "table table-bordered table-striped";
-                    const thead = document.createElement('thead');
-                    const tbody = document.createElement('tbody');
-
-                    // Add table headers
-                    const headerRow = document.createElement('tr');
-                    Object.keys(data.data[0]).forEach(key => {
-                        const th = document.createElement('th');
-                        th.textContent = key;
-                        headerRow.appendChild(th);
-                    });
-                    thead.appendChild(headerRow);
-
-                    // Add table rows
-                    data.data.forEach(row => {
-                        const rowElement = document.createElement('tr');
-                        Object.values(row).forEach(value => {
-                            const td = document.createElement('td');
-                            td.textContent = value;
-                            rowElement.appendChild(td);
-                        });
-                        tbody.appendChild(rowElement);
-                    });
-
-                    table.appendChild(thead);
-                    table.appendChild(tbody);
-                    document.querySelector('#table-output').innerHTML = '';
-                    document.querySelector('#table-output').appendChild(table);
-                } else {
-                    document.querySelector('#table-output').innerHTML = 'No tabular data available.';
-                }
-
-                // Display JSON output
-                document.querySelector('#json-output').textContent = JSON.stringify(data.data, null, 2);
-            } else if (data.message) {
-                document.querySelector('#table-output').innerHTML = '';
-                document.querySelector('#json-output').textContent = data.message;
-            }
-        })
-        .catch(error => {
-            document.querySelector('#table-output').innerHTML = '';
-            document.querySelector('#json-output').textContent = `Error: ${error.message}`;
-        });
+// Handle AI Suggestion
+document.querySelector('#ai-suggest').addEventListener('click', function () {
+    const query = document.querySelector('#query').value;
+    if (!query.trim()) {
+        alert('Please enter a query first');
+        return;
+    }
+    
+    const suggestionDiv = document.getElementById('ai-suggestion');
+    const suggestionText = document.getElementById('suggestion-text');
+    
+    suggestionDiv.classList.remove('d-none');
+    suggestionText.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Getting AI suggestion...';
+    
+    fetch('/ai-suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.suggestion) {
+            suggestionText.innerHTML = data.suggestion;
+        } else {
+            suggestionText.innerHTML = 'No suggestion available at this time.';
+        }
+    })
+    .catch(error => {
+        suggestionText.innerHTML = 'Error getting suggestion.';
     });
+});
+
+// Handle Clear Query
+document.querySelector('#clear-query').addEventListener('click', function () {
+    document.querySelector('#query').value = '';
+    document.getElementById('ai-suggestion').classList.add('d-none');
+    clearOutput();
+});
+
+function executeQuery(payload) {
+    const tableContainer = document.querySelector('#table-container');
+    const jsonDisplay = document.querySelector('#json-display');
+    
+    tableContainer.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i><p>Executing query...</p></div>';
+    jsonDisplay.textContent = '';
+    
+    fetch('/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            tableContainer.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>${data.error}</div>`;
+            jsonDisplay.textContent = `Error: ${data.error}`;
+        } else if (data.data) {
+            renderTable(data.data);
+            jsonDisplay.textContent = JSON.stringify(data.data, null, 2);
+        } else if (data.message) {
+            tableContainer.innerHTML = `<div class="alert alert-success"><i class="fas fa-check me-2"></i>${data.message}</div>`;
+            jsonDisplay.textContent = data.message;
+        }
+    })
+    .catch(error => {
+        tableContainer.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: ${error.message}</div>`;
+        jsonDisplay.textContent = `Error: ${error.message}`;
+    });
+}
+
+function renderTable(data) {
+    if (Array.isArray(data) && data.length > 0) {
+        const table = document.createElement('table');
+        table.className = "table table-bordered table-striped table-hover";
+        const thead = document.createElement('thead');
+        const tbody = document.createElement('tbody');
+
+        // Add table headers
+        const headerRow = document.createElement('tr');
+        Object.keys(data[0]).forEach(key => {
+            const th = document.createElement('th');
+            th.textContent = key;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+
+        // Add table rows
+        data.forEach(row => {
+            const rowElement = document.createElement('tr');
+            Object.values(row).forEach(value => {
+                const td = document.createElement('td');
+                td.textContent = value;
+                rowElement.appendChild(td);
+            });
+            tbody.appendChild(rowElement);
+        });
+
+        table.appendChild(thead);
+        table.appendChild(tbody);
+        
+        const container = document.querySelector('#table-container');
+        container.innerHTML = '';
+        container.appendChild(table);
+        
+        // Add row count
+        const rowCount = document.createElement('p');
+        rowCount.className = 'text-muted mt-2';
+        rowCount.innerHTML = `<i class="fas fa-info-circle me-1"></i>Showing ${data.length} rows`;
+        container.appendChild(rowCount);
+    } else {
+        document.querySelector('#table-container').innerHTML = '<div class="alert alert-info">No data to display</div>';
+    }
+}
+
+function clearOutput() {
+    document.querySelector('#table-container').innerHTML = '';
+    document.querySelector('#json-display').textContent = '';
+}
+
+function applySuggestion() {
+    const suggestionText = document.getElementById('suggestion-text').textContent;
+    document.querySelector('#query').value = suggestionText;
+    document.getElementById('ai-suggestion').classList.add('d-none');
+}
+
+function loadQuery(query) {
+    document.querySelector('#query').value = query;
+    document.getElementById('ai-suggestion').classList.add('d-none');
+}
 </script>
 {% endblock %}

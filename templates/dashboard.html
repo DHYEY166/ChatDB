@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">Dashboard</h2>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ stats.total_queries }}</h4>
+                        <p class="card-text">Total Queries</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-database fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ "%.1f"|format(stats.success_rate) }}%</h4>
+                        <p class="card-text">Success Rate</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-check-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ stats.connections }}</h4>
+                        <p class="card-text">Database Connections</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-plug fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ stats.successful_queries }}</h4>
+                        <p class="card-text">Successful Queries</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-chart-line fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Queries</h5>
+            </div>
+            <div class="card-body">
+                {% if stats.recent_queries %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Query</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for query in stats.recent_queries %}
+                                <tr>
+                                    <td>
+                                        <code class="text-truncate d-inline-block" style="max-width: 200px;" title="{{ query.query }}">
+                                            {{ query.query[:50] }}{% if query.query|length > 50 %}...{% endif %}
+                                        </code>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 'primary' if query.query_type == 'select' else 'warning' }}">
+                                            {{ query.query_type }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if query.success %}
+                                            <span class="badge bg-success">Success</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Failed</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ query.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No recent queries found.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('connect_page') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-database me-2"></i>Connect Database
+                    </a>
+                    <a href="{{ url_for('manage_page') }}" class="btn btn-outline-success">
+                        <i class="fas fa-edit me-2"></i>Manage Data
+                    </a>
+                    <a href="{{ url_for('visualize_page') }}" class="btn btn-outline-info">
+                        <i class="fas fa-chart-bar me-2"></i>Visualize Data
+                    </a>
+                    <a href="{{ url_for('query_history') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-history me-2"></i>View History
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Chart -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Query Performance</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="performanceChart" width="400" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Performance chart
+const ctx = document.getElementById('performanceChart').getContext('2d');
+const performanceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        datasets: [{
+            label: 'Successful Queries',
+            data: [12, 19, 3, 5, 2, 3],
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1
+        }, {
+            label: 'Failed Queries',
+            data: [2, 3, 1, 1, 0, 1],
+            borderColor: 'rgb(255, 99, 132)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+</script>
+{% endblock %} 

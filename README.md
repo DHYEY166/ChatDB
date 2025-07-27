@@ -1,59 +1,63 @@
-# ChatDB - Intelligent Database Management Platform
+# ChatDB - Enhanced Database Management Platform
 
-**ChatDB** is a modern, web-based application that simplifies database management and visualization. With an intuitive interface and powerful features, ChatDB helps you connect to databases, manage data, execute queries, generate reports, and create beautiful visualizations.
+**ChatDB** is a modern, interactive web-based application that simplifies database management and visualization. With enhanced security, AI-powered features, and a beautiful user interface, ChatDB makes database operations intuitive and efficient.
 
-![ChatDB Demo](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
-![Python](https://img.shields.io/badge/Python-3.10+-blue)
-![Flask](https://img.shields.io/badge/Flask-3.1.0-green)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+![ChatDB Dashboard](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.8+-blue)
+![Flask](https://img.shields.io/badge/Flask-3.1.0-red)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## ✨ Features
+---
 
-### 🔌 Database Connectivity
-- **Multiple Database Support**: Connect to SQLite, MySQL, PostgreSQL, and more
-- **Secure Connections**: Encrypted connections with proper authentication
-- **Connection Validation**: Real-time connection testing and validation
-- **URI Templates**: Pre-configured connection strings for easy setup
+## ✨ New Features (v2.0)
 
-### 📊 Data Management
-- **File Upload**: Support for CSV, JSON, and Excel files
-- **Automatic Processing**: Smart data type detection and table creation
-- **Query Execution**: Execute SQL queries with real-time results
-- **Data Validation**: Input sanitization and SQL injection prevention
+### 🔐 Enhanced Security
+- **User Authentication**: Secure login/registration system
+- **Session Management**: Protected routes and user sessions
+- **SQL Injection Prevention**: Query validation and sanitization
+- **Password Hashing**: Secure password storage with Werkzeug
 
-### 📈 Data Visualization
-- **Multiple Chart Types**: Bar charts, line charts, scatter plots, and pie charts
-- **Interactive Charts**: Responsive visualizations with hover effects
-- **Custom Styling**: Beautiful, modern chart designs
-- **Export Options**: Download charts as high-resolution images
+### 🤖 AI-Powered Features
+- **Query Suggestions**: Get intelligent SQL query improvements
+- **Error Analysis**: AI-powered error explanations
+- **Smart Recommendations**: Context-aware database suggestions
 
-### 📋 Report Generation
-- **CSV Export**: Generate downloadable reports in CSV format
-- **Custom Data**: Upload JSON data for custom report generation
-- **Timestamped Files**: Automatic file naming with timestamps
-- **Data Validation**: JSON validation and error handling
+### 📊 Advanced Analytics
+- **Query History**: Track and review all executed queries
+- **Performance Metrics**: Execution time and success rate tracking
+- **User Dashboard**: Comprehensive statistics and insights
+- **Export Capabilities**: Download query history and reports
 
 ### 🎨 Modern UI/UX
-- **Responsive Design**: Works perfectly on desktop, tablet, and mobile
-- **Modern Styling**: Beautiful gradient backgrounds and smooth animations
-- **Loading States**: Visual feedback during operations
-- **Error Handling**: User-friendly error messages and alerts
+- **Responsive Design**: Works perfectly on all devices
+- **Dark Theme**: Professional dark mode interface
+- **Interactive Charts**: Beautiful data visualizations
+- **Real-time Feedback**: Live status updates and notifications
+
+### 📈 Enhanced Data Management
+- **Multi-format Support**: CSV, JSON, Excel file uploads
+- **Connection Management**: Save and manage multiple database connections
+- **Advanced Visualization**: Bar charts, line charts, scatter plots
+- **Report Generation**: Automated CSV report creation
+
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.10 or higher
-- A database system (SQLite, MySQL, PostgreSQL, etc.)
+- Python 3.8+
+- Git
+- A modern web browser
 
-### Local Installation
+### Local Development
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/DHYEY166/ChatDB.git
+   git clone https://github.com/yourusername/ChatDB.git
    cd ChatDB
    ```
 
-2. **Create a virtual environment**
+2. **Create virtual environment**
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -64,11 +68,10 @@
    pip install -r requirements.txt
    ```
 
-4. **Set up environment variables**
+4. **Set environment variables**
    ```bash
-   # Create a .env file (optional)
-   echo "SECRET_KEY=your-secret-key-here" > .env
-   echo "FLASK_ENV=development" >> .env
+   export SECRET_KEY="your-secret-key-here"
+   export OPENAI_API_KEY="your-openai-api-key"  # Optional
    ```
 
 5. **Run the application**
@@ -77,175 +80,225 @@
    ```
 
 6. **Open your browser**
-   Navigate to `http://127.0.0.1:5000`
+   Navigate to `http://localhost:5000`
 
-## 🌐 Deployment
+---
 
-### Railway Deployment (Recommended)
+## 🌐 Free Deployment
+
+### Option 1: Render (Recommended)
 
 1. **Fork this repository** to your GitHub account
 
-2. **Connect to Railway**
-   - Go to [Railway.app](https://railway.app)
-   - Sign in with your GitHub account
-   - Click "New Project" → "Deploy from GitHub repo"
-   - Select your forked repository
+2. **Sign up for Render** at [render.com](https://render.com)
 
-3. **Configure Environment Variables** (Optional)
-   - Go to your project settings
-   - Add environment variables:
-     - `SECRET_KEY`: A secure random string
-     - `OPENAI_API_KEY`: Your OpenAI API key (if using AI features)
+3. **Create a new Web Service**
+   - Connect your GitHub repository
+   - Choose the repository you just forked
+   - Set the following:
+     - **Name**: `chatdb`
+     - **Environment**: `Python 3`
+     - **Build Command**: `pip install -r requirements.txt`
+     - **Start Command**: `gunicorn app:app`
 
+4. **Set Environment Variables**
+   - `SECRET_KEY`: Generate a random string
+   - `OPENAI_API_KEY`: Your OpenAI API key (optional)
+
+5. **Deploy!**
+   Click "Create Web Service" and wait for deployment
+
+### Option 2: Railway
+
+1. **Sign up for Railway** at [railway.app](https://railway.app)
+
+2. **Connect your GitHub repository**
+
+3. **Deploy automatically**
+   Railway will detect the Python app and deploy it
+
+### Option 3: Heroku (Legacy)
+
+1. **Install Heroku CLI**
+2. **Create Heroku app**
+   ```bash
+   heroku create your-chatdb-app
+   ```
+3. **Set environment variables**
+   ```bash
+   heroku config:set SECRET_KEY="your-secret-key"
+   heroku config:set OPENAI_API_KEY="your-openai-key"
+   ```
 4. **Deploy**
-   - Railway will automatically detect the Python app
-   - The app will be deployed and you'll get a live URL
+   ```bash
+   git push heroku main
+   ```
 
-### Alternative Deployment Options
-
-#### Heroku
-```bash
-# Install Heroku CLI
-heroku create your-app-name
-git push heroku main
-```
-
-#### Vercel
-```bash
-# Install Vercel CLI
-npm i -g vercel
-vercel
-```
-
-#### Docker
-```dockerfile
-FROM python:3.10-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-EXPOSE 5000
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000"]
-```
+---
 
 ## 📁 Project Structure
 
 ```
 ChatDB/
 ├── app.py                 # Main Flask application
+├── database_setup.py      # Database setup utilities
 ├── requirements.txt       # Python dependencies
-├── Procfile              # Heroku deployment config
-├── railway.json          # Railway deployment config
-├── runtime.txt           # Python version specification
-├── templates/            # HTML templates
-│   ├── base.html         # Base template
-│   ├── index.html        # Homepage
-│   ├── connect.html      # Database connection
-│   ├── manage.html       # Data management
-│   ├── visualize.html    # Data visualization
-│   ├── report.html       # Report generation
-│   ├── 404.html          # 404 error page
-│   └── 500.html          # 500 error page
-├── static/               # Static files
-│   ├── css/
-│   │   └── styles.css    # Custom styles
-│   └── js/
-│       └── scripts.js    # JavaScript functionality
-├── data/                 # Database files
-│   └── example.db        # SQLite database
-└── uploads/              # File upload directory
+├── render.yaml           # Render deployment config
+├── deploy.sh            # Deployment script
+├── templates/           # HTML templates
+│   ├── base.html       # Base layout
+│   ├── index.html      # Homepage
+│   ├── login.html      # Login page
+│   ├── register.html   # Registration page
+│   ├── dashboard.html  # User dashboard
+│   ├── manage.html     # Data management
+│   ├── visualize.html  # Data visualization
+│   ├── history.html    # Query history
+│   └── error pages     # 404, 500 pages
+├── static/             # Static files
+│   ├── css/           # Stylesheets
+│   └── js/            # JavaScript files
+└── data/              # Database files
 ```
+
+---
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SECRET_KEY` | Flask secret key | Auto-generated |
-| `FLASK_ENV` | Flask environment | `production` |
-| `DATABASE_URL` | Database connection string | `sqlite:///data/example.db` |
-| `OPENAI_API_KEY` | OpenAI API key (optional) | None |
-| `PORT` | Server port | `5000` |
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `SECRET_KEY` | Flask secret key | Yes | Auto-generated |
+| `OPENAI_API_KEY` | OpenAI API key for AI features | No | None |
+| `PORT` | Server port | No | 5000 |
 
-### Database Connection Examples
+### Database Support
 
-```bash
-# SQLite
-sqlite:///data/example.db
-
-# MySQL
-mysql+pymysql://username:password@localhost/database_name
-
-# PostgreSQL
-postgresql://username:password@localhost/database_name
-```
-
-## 🛡️ Security Features
-
-- **SQL Injection Prevention**: Query validation and sanitization
-- **File Upload Security**: File type validation and size limits
-- **Input Sanitization**: XSS prevention and data cleaning
-- **Secure Headers**: CSRF protection and security headers
-- **Error Handling**: Safe error messages without information leakage
-
-## 🎨 UI/UX Improvements
-
-- **Modern Design**: Gradient backgrounds and smooth animations
-- **Responsive Layout**: Mobile-first design approach
-- **Loading States**: Visual feedback during operations
-- **Toast Notifications**: User-friendly success/error messages
-- **Copy to Clipboard**: Easy data copying functionality
-- **Auto-resize Textareas**: Dynamic form field sizing
-
-## 🔄 API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Homepage |
-| `/connect` | GET/POST | Database connection |
-| `/manage` | GET/POST | Data management and queries |
-| `/upload` | POST | File upload |
-| `/visualize` | GET/POST | Data visualization |
-| `/report` | GET/POST | Report generation |
-
-## 🤝 Contributing
-
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Commit your changes**
-   ```bash
-   git commit -m 'Add amazing feature'
-   ```
-4. **Push to the branch**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-5. **Open a Pull Request**
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Flask**: Web framework
-- **Bootstrap**: CSS framework
-- **Font Awesome**: Icons
-- **Matplotlib**: Data visualization
-- **Pandas**: Data manipulation
-- **SQLAlchemy**: Database ORM
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/DHYEY166/ChatDB/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/DHYEY166/ChatDB/discussions)
-- **Email**: [Contact Maintainer](mailto:your-email@example.com)
+- **SQLite**: Built-in support (default)
+- **MySQL**: Requires `mysql-connector-python`
+- **PostgreSQL**: Requires `psycopg2-binary`
 
 ---
 
-**Made with ❤️ by [DHYEY166](https://github.com/DHYEY166)**
+## 🎯 Features
+
+### 🔐 Authentication & Security
+- User registration and login
+- Password hashing and validation
+- Session management
+- Protected routes
+- SQL injection prevention
+
+### 📊 Data Management
+- Multi-format file uploads (CSV, JSON, Excel)
+- SQL query execution
+- Real-time data visualization
+- Report generation
+- Query history tracking
+
+### 🤖 AI Integration
+- Query optimization suggestions
+- Error analysis and explanations
+- Smart database recommendations
+- Context-aware assistance
+
+### 📈 Analytics & Monitoring
+- Query performance metrics
+- Success rate tracking
+- User activity monitoring
+- Export capabilities
+
+### 🎨 User Interface
+- Responsive Bootstrap design
+- Dark theme support
+- Interactive charts
+- Real-time notifications
+- Mobile-friendly interface
+
+---
+
+## 🛠️ Development
+
+### Running Tests
+```bash
+python -m pytest tests/
+```
+
+### Code Style
+```bash
+black .
+flake8 .
+```
+
+### Database Migrations
+```bash
+flask db upgrade
+```
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Setup
+```bash
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Run linting
+pre-commit install
+pre-commit run --all-files
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **Flask** - Web framework
+- **Bootstrap** - CSS framework
+- **Chart.js** - Data visualization
+- **FontAwesome** - Icons
+- **OpenAI** - AI features
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/yourusername/ChatDB/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yourusername/ChatDB/discussions)
+- **Email**: your-email@example.com
+
+---
+
+## 🔄 Changelog
+
+### v2.0.0 (Current)
+- ✨ Added user authentication system
+- 🤖 Integrated AI-powered query suggestions
+- 📊 Enhanced analytics and dashboard
+- 🎨 Modernized UI with dark theme
+- 🔐 Improved security features
+- 📈 Added query history and performance tracking
+
+### v1.0.0
+- 🎉 Initial release
+- 📊 Basic database management
+- 📈 Simple data visualization
+- 📁 File upload support
+
+---
+
+**Made with ❤️ by [Your Name]**
 
