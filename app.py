@@ -177,6 +177,45 @@ def validate_sql_query(query):
     
     return True, "Query is safe"
 
+def init_database():
+    """Initialize database with proper error handling"""
+    try:
+        with app.app_context():
+            db.create_all()
+            logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
+        # Try to create database file manually
+        try:
+            import sqlite3
+            conn = sqlite3.connect(db_path)
+            conn.close()
+            logger.info("Database file created manually")
+        except Exception as e2:
+            logger.error(f"Manual database creation failed: {e2}")
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for deployment monitoring"""
+    try:
+        # Test database connection
+        with app.app_context():
+            db.session.execute(text("SELECT 1"))
+            db.session.commit()
+        
+        return jsonify({
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return jsonify({
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }), 500
+
 @app.route('/')
 def index():
     return render_template('index.html', title="Home")
@@ -184,44 +223,70 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
-            flask_session['user_id'] = user.id
-            flask_session['username'] = user.username
-            user.last_login = datetime.utcnow()
-            db.session.commit()
-            flash('Login successful!', 'success')
-            return redirect(url_for('index'))
-        else:
-            flash('Invalid username or password', 'error')
+        try:
+            username = request.form.get('username')
+            password = request.form.get('password')
+            
+            user = User.query.filter_by(username=username).first()
+            if user and user.check_password(password):
+                flask_session['user_id'] = user.id
+                flask_session['username'] = user.username
+                user.last_login = datetime.utcnow()
+                db.session.commit()
+                flash('Login successful!', 'success')
+                return redirect(url_for('index'))
+            else:
+                flash('Invalid username or password', 'error')
+        except Exception as e:
+            logger.error(f"Login error: {e}")
+            flash('An error occurred during login. Please try again.', 'error')
     
     return render_template('login.html', title="Login")
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        
-        if User.query.filter_by(username=username).first():
-            flash('Username already exists', 'error')
+        try:
+            username = request.form.get('username')
+            email = request.form.get('email')
+            password = request.form.get('password')
+            
+            # Validate input
+            if not username or not email or not password:
+                flash('All fields are required', 'error')
+                return render_template('register.html', title="Register")
+            
+            if len(username) < 3:
+                flash('Username must be at least 3 characters long', 'error')
+                return render_template('register.html', title="Register")
+            
+            if len(password) < 6:
+                flash('Password must be at least 6 characters long', 'error')
+                return render_template('register.html', title="Register")
+            
+            # Check if user already exists
+            if User.query.filter_by(username=username).first():
+                flash('Username already exists', 'error')
+                return render_template('register.html', title="Register")
+            
+            if User.query.filter_by(email=email).first():
+                flash('Email already registered', 'error')
+                return render_template('register.html', title="Register")
+            
+            # Create new user
+            user = User(username=username, email=email)
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+            
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            logger.error(f"Registration error: {e}")
+            db.session.rollback()
+            flash('An error occurred during registration. Please try again.', 'error')
             return render_template('register.html', title="Register")
-        
-        if User.query.filter_by(email=email).first():
-            flash('Email already registered', 'error')
-            return render_template('register.html', title="Register")
-        
-        user = User(username=username, email=email)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
-        
-        flash('Registration successful! Please log in.', 'success')
-        return redirect(url_for('login'))
     
     return render_template('register.html', title="Register")
 
@@ -532,10 +597,11 @@ def not_found_error(error):
 @app.errorhandler(500)
 def internal_error(error):
     db.session.rollback()
+    logger.error(f"500 error: {error}")
     return render_template('500.html'), 500
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
+    # Initialize database on startup
+    init_database()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
