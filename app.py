@@ -1,7 +1,6 @@
 from flask import Flask, render_template, jsonify, request, session as flask_session, flash, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
-from sqlalchemy.orm import sessionmaker
 import pandas as pd
 import os
 import logging
@@ -32,12 +31,6 @@ print(f"Database Path: {db_path}")
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
-# Setup SQLAlchemy session
-with app.app_context():
-    engine = db.engine
-    SQLAlchemySession = sessionmaker(bind=engine)
-    sqlalchemy_session = SQLAlchemySession()
 
 # Hugging Face API Key
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
@@ -197,67 +190,73 @@ def validate_sql_query(query):
 def init_database():
     """Initialize database with proper error handling"""
     try:
-        # First, try to create tables manually to ensure they exist
-        import sqlite3
-        conn = sqlite3.connect(db_path)
+        print("Initializing database...")
         
-        # Create tables manually
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS user (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username VARCHAR(80) UNIQUE NOT NULL,
-                email VARCHAR(120) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_login DATETIME
-            )
-        ''')
-        
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS query_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                query TEXT NOT NULL,
-                query_type VARCHAR(50) NOT NULL,
-                execution_time FLOAT,
-                success BOOLEAN DEFAULT 1,
-                error_message TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES user (id)
-            )
-        ''')
-        
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS database_connection (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                name VARCHAR(100) NOT NULL,
-                connection_string TEXT NOT NULL,
-                database_type VARCHAR(50) NOT NULL,
-                is_active BOOLEAN DEFAULT 1,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES user (id)
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
-        logger.info("Database tables created manually")
-        
-        # Now try SQLAlchemy initialization
+        # Create tables using SQLAlchemy
         with app.app_context():
             db.create_all()
-            logger.info("SQLAlchemy tables created successfully")
+            print("Database tables created successfully")
             
             # Test the database
             db.session.execute(text("SELECT 1"))
             db.session.commit()
-            logger.info("Database connection test successful")
+            print("Database connection test successful")
             
     except Exception as e:
+        print(f"Database initialization error: {e}")
         logger.error(f"Database initialization error: {e}")
-        # If SQLAlchemy fails, we already have the tables from manual creation
-        logger.info("Using manually created tables")
+        
+        # Fallback: try manual table creation
+        try:
+            import sqlite3
+            conn = sqlite3.connect(db_path)
+            
+            # Create tables manually
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS user (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username VARCHAR(80) UNIQUE NOT NULL,
+                    email VARCHAR(120) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_login DATETIME
+                )
+            ''')
+
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS query_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    query TEXT NOT NULL,
+                    query_type VARCHAR(50) NOT NULL,
+                    execution_time FLOAT,
+                    success BOOLEAN DEFAULT 1,
+                    error_message TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user (id)
+                )
+            ''')
+
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS database_connection (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    name VARCHAR(100) NOT NULL,
+                    connection_string TEXT NOT NULL,
+                    database_type VARCHAR(50) NOT NULL,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user (id)
+                )
+            ''')
+
+            conn.commit()
+            conn.close()
+            print("Database tables created manually")
+            
+        except Exception as manual_error:
+            print(f"Manual table creation failed: {manual_error}")
+            logger.error(f"Manual table creation failed: {manual_error}")
 
 def reset_database():
     """Reset database for Render deployment"""
