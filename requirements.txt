@@ -5,8 +5,7 @@ SQLAlchemy==2.0.36
 pandas==2.2.3
 matplotlib==3.10.0
 openai==1.60.1
+numpy==2.2.2
 Werkzeug>=3.1
 gunicorn==23.0.0
-numpy==2.2.2
-python-dateutil==2.9.0.post0
-requests==2.31.0
+openpyxl==3.1.2

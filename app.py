@@ -2,6 +2,7 @@ from flask import Flask, render_template, jsonify, request, session as flask_ses
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
 import pandas as pd
 import os
 import openai
@@ -10,11 +11,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import re
 import json
-from werkzeug.utils import secure_filename
-from functools import wraps
-import hashlib
-import time
 from datetime import datetime
+from werkzeug.utils import secure_filename
 matplotlib.use('Agg')
 
 # Initialize Flask app
@@ -29,9 +27,7 @@ db_path = os.path.abspath("data/example.db")
 print(f"Database Path: {db_path}")  # Debugging the database path
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
 db = SQLAlchemy(app)
 
 # Setup SQLAlchemy session
@@ -40,6 +36,10 @@ with app.app_context():
     SQLAlchemySession = sessionmaker(bind=engine)
     sqlalchemy_session = SQLAlchemySession()
 
+# Flask session for storing query results
+app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
+app.config['SESSION_TYPE'] = 'filesystem'
+
 # OpenAI API Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -47,43 +47,27 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Security: SQL injection prevention
+# Allowed file extensions
+ALLOWED_EXTENSIONS = {'csv', 'json', 'xlsx'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def sanitize_sql_query(query):
-    """Basic SQL injection prevention"""
+    """Basic SQL injection protection"""
+    # Remove comments
+    query = re.sub(r'--.*$', '', query, flags=re.MULTILINE)
+    query = re.sub(r'/\*.*?\*/', '', query, flags=re.DOTALL)
+    
+    # Check for dangerous keywords (basic protection)
     dangerous_keywords = ['DROP', 'DELETE', 'TRUNCATE', 'ALTER', 'CREATE', 'INSERT', 'UPDATE']
     query_upper = query.upper()
     
-    # Check for dangerous operations
     for keyword in dangerous_keywords:
         if keyword in query_upper and not query_upper.strip().startswith('SELECT'):
-            raise ValueError(f"Operation {keyword} is not allowed for security reasons")
+            raise ValueError(f"Operation '{keyword}' is not allowed for security reasons")
     
-    return query
-
-# Rate limiting decorator
-def rate_limit(max_requests=10, window=60):
-    def decorator(f):
-        @wraps(f)
-        def wrapped(*args, **kwargs):
-            client_ip = request.remote_addr
-            current_time = time.time()
-            
-            if 'rate_limit' not in flask_session:
-                flask_session['rate_limit'] = {}
-            
-            if client_ip not in flask_session['rate_limit']:
-                flask_session['rate_limit'][client_ip] = {'count': 0, 'reset_time': current_time + window}
-            
-            if current_time > flask_session['rate_limit'][client_ip]['reset_time']:
-                flask_session['rate_limit'][client_ip] = {'count': 0, 'reset_time': current_time + window}
-            
-            if flask_session['rate_limit'][client_ip]['count'] >= max_requests:
-                return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
-            
-            flask_session['rate_limit'][client_ip]['count'] += 1
-            return f(*args, **kwargs)
-        return wrapped
-    return decorator
+    return query.strip()
 
 # Define a Sample Model
 class User(db.Model):
@@ -98,16 +82,15 @@ class User(db.Model):
 class QueryHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     query = db.Column(db.Text, nullable=False)
-    executed_at = db.Column(db.DateTime, default=datetime.utcnow)
-    success = db.Column(db.Boolean, default=True)
-    error_message = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    result_count = db.Column(db.Integer)
+    status = db.Column(db.String(20))  # success, error
 
 @app.route('/')
 def index():
     return render_template('index.html', title="Home")
 
 @app.route('/connect', methods=['GET', 'POST'])
-@rate_limit(max_requests=5, window=60)
 def connect_page():
     if request.method == 'POST':
         db_uri = request.json.get('db_uri')
@@ -115,38 +98,35 @@ def connect_page():
             return jsonify({"error": "SQL Database URI is required."}), 400
         
         # Validate URI format
-        if not re.match(r'^[a-zA-Z]+://', db_uri):
-            return jsonify({"error": "Invalid database URI format."}), 400
+        if not db_uri.startswith(('sqlite://', 'mysql://', 'postgresql://')):
+            return jsonify({"error": "Invalid database URI format. Supported: sqlite://, mysql://, postgresql://"}), 400
         
         try:
             app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
             db.engine.dispose()  # Close existing connections
             with app.app_context():
                 db.create_all()
-            flask_session['current_db_uri'] = db_uri
-            return jsonify({"message": f"Connected to SQL database: {db_uri}"})
+                # Test the connection
+                db.session.execute(text("SELECT 1"))
+                db.session.commit()
+            return jsonify({"message": f"Successfully connected to database: {db_uri}"})
         except Exception as e:
             logger.error(f"Error connecting to SQL: {e}")
             return jsonify({"error": f"Connection failed: {str(e)}"}), 500
     return render_template('connect.html', title="Connect to Database")
 
 @app.route('/manage', methods=['GET', 'POST'])
-@rate_limit(max_requests=20, window=60)
 def manage_page():
     if request.method == 'POST':
         query = request.json.get('query')
         if not query:
-            return jsonify({"error": "Query is required."}), 400
+            return jsonify({"error": "Query is required"}), 400
         
         try:
-            # Sanitize query
+            # Sanitize the query
             sanitized_query = sanitize_sql_query(query)
             
             with app.app_context():
-                # Log query for history
-                query_history = QueryHistory(query=sanitized_query)
-                db.session.add(query_history)
-                
                 # Execute the query using SQLAlchemy session
                 if sanitized_query.strip().lower().startswith("select"):
                     result = db.session.execute(text(sanitized_query))
@@ -154,39 +134,47 @@ def manage_page():
                     columns = result.keys()
                     rows = [dict(zip(columns, row)) for row in result]
                     
-                    query_history.success = True
+                    # Save to query history
+                    history_entry = QueryHistory(
+                        query=sanitized_query,
+                        result_count=len(rows),
+                        status='success'
+                    )
+                    db.session.add(history_entry)
                     db.session.commit()
                     
                     return jsonify({
                         "data": rows,
-                        "row_count": len(rows),
+                        "count": len(rows),
                         "columns": list(columns)
                     })
                 else:
                     db.session.execute(text(sanitized_query))
                     db.session.commit()
                     
-                    query_history.success = True
+                    # Save to query history
+                    history_entry = QueryHistory(
+                        query=sanitized_query,
+                        result_count=0,
+                        status='success'
+                    )
+                    db.session.add(history_entry)
                     db.session.commit()
                     
                     return jsonify({"message": "Query executed successfully."})
         except ValueError as e:
-            query_history.success = False
-            query_history.error_message = str(e)
-            db.session.commit()
             return jsonify({"error": str(e)}), 400
-        except Exception as e:
-            if 'query_history' in locals():
-                query_history.success = False
-                query_history.error_message = str(e)
-                db.session.commit()
+        except SQLAlchemyError as e:
             db.session.rollback()
-            logger.error(f"Query execution error: {e}")
-            return jsonify({"error": f"Query execution failed: {str(e)}"}), 500
+            logger.error(f"Database error: {e}")
+            return jsonify({"error": f"Database error: {str(e)}"}), 500
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Unexpected error: {e}")
+            return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
     return render_template('manage.html', title="Manage Data")
 
 @app.route('/upload', methods=['POST'])
-@rate_limit(max_requests=5, window=60)
 def upload_file():
     UPLOAD_FOLDER = 'uploads'
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -198,14 +186,10 @@ def upload_file():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
-    # Validate file type
-    allowed_extensions = {'csv', 'json'}
-    file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-    
-    if file_extension not in allowed_extensions:
-        return jsonify({"error": "Only CSV and JSON files are allowed"}), 400
+    if not allowed_file(file.filename):
+        return jsonify({"error": "File type not allowed. Please upload CSV, JSON, or Excel files."}), 400
 
-    # Secure filename
+    # Secure the filename
     filename = secure_filename(file.filename)
     table_name = os.path.splitext(filename)[0].lower()
     table_name = ''.join(c if c.isalnum() else '_' for c in table_name)
@@ -216,8 +200,7 @@ def upload_file():
     file.save(file_path)
 
     try:
-        if request.form.get('file_type') == 'json':
-            import json
+        if filename.endswith('.json'):
             with open(file_path, 'r') as f:
                 data = json.load(f)
 
@@ -241,8 +224,13 @@ def upload_file():
 
             flattened_data = flatten_json(data if isinstance(data, list) else [data])
             df = pd.DataFrame(flattened_data)
+        elif filename.endswith('.xlsx'):
+            df = pd.read_excel(file_path)
         else:
             df = pd.read_csv(file_path)
+
+        # Clean column names
+        df.columns = [str(col).strip().replace(' ', '_').lower() for col in df.columns]
 
         with app.app_context():
             inspector = db.inspect(db.engine)
@@ -256,17 +244,16 @@ def upload_file():
             "message": f"File uploaded successfully as table '{table_name}'",
             "table_name": table_name,
             "columns": list(df.columns),
-            "row_count": len(df)
+            "rows": len(df)
         })
     except Exception as e:
-        logger.error(f"File upload error: {e}")
+        logger.error(f"File processing error: {e}")
         return jsonify({"error": f"Error processing file: {str(e)}"}), 500
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
 
 @app.route('/visualize', methods=['GET', 'POST'])
-@rate_limit(max_requests=10, window=60)
 def visualize_page():
     if request.method == 'GET':
         return render_template("visualize.html")
@@ -278,9 +265,9 @@ def visualize_page():
         chart_type = request.json.get('chart_type', 'bar')
         
         if not all([query, x_axis, y_axis]):
-            return jsonify({"error": "Query, x_axis, and y_axis are required"}), 400
+            return jsonify({"error": "Query, X-axis, and Y-axis are required"}), 400
         
-        # Sanitize query
+        # Sanitize the query
         sanitized_query = sanitize_sql_query(query)
         
         with app.app_context():
@@ -291,10 +278,10 @@ def visualize_page():
 
             df = pd.DataFrame(rows)
             df.columns = result.keys()
-            
+
             # Validate columns exist
             if x_axis not in df.columns or y_axis not in df.columns:
-                return jsonify({"error": f"Columns {x_axis} or {y_axis} not found in query results"}), 400
+                return jsonify({"error": "Specified columns not found in query results"}), 400
 
             plt.figure(figsize=(15, 8))
             plt.style.use('seaborn-v0_8')
@@ -328,7 +315,7 @@ def visualize_page():
 
             plt.xlabel(x_axis, fontsize=12, fontweight='bold')
             plt.ylabel(y_axis, fontsize=12, fontweight='bold')
-            plt.title(f"{chart_type.capitalize()} Chart of {y_axis} vs {x_axis}", 
+            plt.title(f"{chart_type.capitalize()} Chart: {y_axis} vs {x_axis}", 
                      fontsize=14, fontweight='bold', pad=20)
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
@@ -347,112 +334,89 @@ def visualize_page():
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         logger.error(f"Visualization error: {e}")
-        return jsonify({"error": f"Visualization failed: {str(e)}"}), 500
+        return jsonify({"error": f"Visualization error: {str(e)}"}), 500
 
 @app.route('/report', methods=['GET', 'POST'])
-@rate_limit(max_requests=5, window=60)
 def report_page():
     if request.method == 'GET':
         return render_template("report.html", message="Submit data using the form below.")
 
     data = request.json.get('data')
     if not data:
-        return jsonify({"error": "Data is required"}), 400
+        return jsonify({"error": "No data provided"}), 400
     
+    report_path = 'static/report.csv'
     try:
         df = pd.DataFrame(data)
-        report_path = 'static/report.csv'
         df.to_csv(report_path, index=False)
-        
         return jsonify({
             "message": "Report generated successfully.",
             "report_url": report_path,
-            "row_count": len(df),
-            "column_count": len(df.columns)
+            "rows": len(df),
+            "columns": list(df.columns)
         })
     except Exception as e:
         logger.error(f"Report generation error: {e}")
-        return jsonify({"error": f"Report generation failed: {str(e)}"}), 500
+        return jsonify({"error": f"Report generation error: {str(e)}"}), 500
 
-@app.route('/api/suggest-query', methods=['POST'])
-@rate_limit(max_requests=5, window=60)
-def suggest_query():
-    """AI-powered query suggestions"""
-    if not openai.api_key:
-        return jsonify({"error": "OpenAI API key not configured"}), 500
-    
+@app.route('/history')
+def query_history():
+    """Get query history"""
     try:
-        data = request.json
-        table_info = data.get('table_info', '')
-        user_intent = data.get('intent', '')
-        
-        prompt = f"""
-        Given the following table information:
-        {table_info}
-        
-        User intent: {user_intent}
-        
-        Generate a SQL query that matches the user's intent. 
-        Only return the SQL query, nothing else.
-        """
-        
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=150
-        )
-        
-        suggested_query = response.choices[0].message.content.strip()
-        return jsonify({"suggested_query": suggested_query})
-        
+        with app.app_context():
+            history = QueryHistory.query.order_by(QueryHistory.timestamp.desc()).limit(20).all()
+            return jsonify({
+                "history": [
+                    {
+                        "id": h.id,
+                        "query": h.query,
+                        "timestamp": h.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                        "result_count": h.result_count,
+                        "status": h.status
+                    } for h in history
+                ]
+            })
     except Exception as e:
-        logger.error(f"Query suggestion error: {e}")
-        return jsonify({"error": "Failed to generate query suggestion"}), 500
+        logger.error(f"Error fetching history: {e}")
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/api/tables', methods=['GET'])
+@app.route('/tables')
 def get_tables():
     """Get list of available tables"""
     try:
         with app.app_context():
             inspector = db.inspect(db.engine)
             tables = inspector.get_table_names()
-            
-            table_info = []
-            for table in tables:
-                columns = inspector.get_columns(table)
-                table_info.append({
-                    "name": table,
-                    "columns": [col['name'] for col in columns]
-                })
-            
-            return jsonify({"tables": table_info})
+            return jsonify({"tables": tables})
     except Exception as e:
-        logger.error(f"Error getting tables: {e}")
-        return jsonify({"error": "Failed to get table information"}), 500
+        logger.error(f"Error fetching tables: {e}")
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/api/query-history', methods=['GET'])
-def get_query_history():
-    """Get recent query history"""
+@app.route('/table/<table_name>')
+def get_table_info(table_name):
+    """Get table structure and sample data"""
     try:
         with app.app_context():
-            recent_queries = QueryHistory.query.order_by(QueryHistory.executed_at.desc()).limit(10).all()
+            inspector = db.inspect(db.engine)
+            if table_name not in inspector.get_table_names():
+                return jsonify({"error": "Table not found"}), 404
             
-            history = []
-            for query in recent_queries:
-                history.append({
-                    "query": query.query,
-                    "executed_at": query.executed_at.strftime("%Y-%m-%d %H:%M:%S"),
-                    "success": query.success,
-                    "error_message": query.error_message
-                })
+            columns = inspector.get_columns(table_name)
+            sample_query = f"SELECT * FROM {table_name} LIMIT 5"
+            result = db.session.execute(text(sample_query))
+            sample_data = [dict(zip(result.keys(), row)) for row in result]
             
-            return jsonify({"history": history})
+            return jsonify({
+                "table_name": table_name,
+                "columns": [{"name": col["name"], "type": str(col["type"])} for col in columns],
+                "sample_data": sample_data
+            })
     except Exception as e:
-        logger.error(f"Error getting query history: {e}")
-        return jsonify({"error": "Failed to get query history"}), 500
+        logger.error(f"Error fetching table info: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # Optional: Initializes your database
-    port = int(os.environ.get('PORT', 5000))  # Heroku provides the PORT environment variable
-    app.run(host='0.0.0.0', port=port)
+        db.create_all()  # Initialize database tables
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

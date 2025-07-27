@@ -1,100 +1,75 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="hero-section">
-    <h1><i class="fas fa-database me-3"></i>Welcome to ChatDB</h1>
-    <p class="lead">Connect, manage, and visualize your databases effortlessly with our powerful web-based platform.</p>
-    <a href="{{ url_for('connect_page') }}" class="btn btn-primary btn-lg">
-        <i class="fas fa-rocket me-2"></i>Get Started
-    </a>
-</div>
-
-<div class="row">
-    <div class="col-lg-3 col-md-6 mb-4">
-        <div class="feature-card">
-            <i class="fas fa-plug"></i>
-            <h3>Connect</h3>
-            <p>Easily connect to SQLite, MySQL, PostgreSQL, and other databases with our intuitive connection interface.</p>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-4">
-        <div class="feature-card">
-            <i class="fas fa-cogs"></i>
-            <h3>Manage</h3>
-            <p>Upload CSV/JSON files, execute SQL queries, and manage your data with powerful tools and real-time feedback.</p>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-4">
-        <div class="feature-card">
-            <i class="fas fa-chart-bar"></i>
-            <h3>Visualize</h3>
-            <p>Create beautiful charts and graphs from your data with customizable visualizations and export options.</p>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-4">
-        <div class="feature-card">
-            <i class="fas fa-file-alt"></i>
-            <h3>Reports</h3>
-            <p>Generate comprehensive reports and export data in various formats for analysis and sharing.</p>
-        </div>
-    </div>
-</div>
-
-<div class="row mt-5">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h4><i class="fas fa-info-circle me-2"></i>Quick Start Guide</h4>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h5><i class="fas fa-1 me-2"></i>Connect to Database</h5>
-                        <p>Start by connecting to your database using the connection string format. We support SQLite, MySQL, PostgreSQL, and more.</p>
-                        
-                        <h5><i class="fas fa-2 me-2"></i>Upload Data</h5>
-                        <p>Upload CSV or JSON files to import your data into the database. Our system automatically handles data formatting and validation.</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h5><i class="fas fa-3 me-2"></i>Execute Queries</h5>
-                        <p>Run SQL queries to explore and manipulate your data. Get instant results with tabular and JSON output formats.</p>
-                        
-                        <h5><i class="fas fa-4 me-2"></i>Visualize Results</h5>
-                        <p>Create charts and graphs from your query results. Choose from bar charts, line charts, and scatter plots.</p>
-                    </div>
+<div class="hero-section text-center">
+    <h1 class="display-4 fw-bold text-primary mb-4">Welcome to ChatDB</h1>
+    <p class="lead mb-5">Your interactive database management and visualization platform</p>
+    
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-database"></i>
                 </div>
+                <h5>Connect</h5>
+                <p>Connect to SQLite, MySQL, or PostgreSQL databases</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-upload"></i>
+                </div>
+                <h5>Upload</h5>
+                <p>Upload CSV, JSON, or Excel files for analysis</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <h5>Visualize</h5>
+                <p>Create beautiful charts and graphs from your data</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <h5>Reports</h5>
+                <p>Generate downloadable reports in CSV format</p>
             </div>
         </div>
     </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h4><i class="fas fa-shield-alt me-2"></i>Security Features</h4>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="quick-start-card">
+                <h4><i class="fas fa-rocket"></i> Quick Start</h4>
+                <ol class="text-start">
+                    <li>Go to <strong>Connect</strong> to set up your database</li>
+                    <li>Use <strong>Manage</strong> to upload files or run queries</li>
+                    <li>Visit <strong>Visualize</strong> to create charts</li>
+                    <li>Generate <strong>Reports</strong> for sharing</li>
+                </ol>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="text-center mb-3">
-                            <i class="fas fa-lock fa-2x text-primary mb-2"></i>
-                            <h6>SQL Injection Protection</h6>
-                            <p class="text-muted">Advanced input validation and query sanitization</p>
+        </div>
+        <div class="col-md-6">
+            <div class="stats-card">
+                <h4><i class="fas fa-chart-line"></i> Platform Stats</h4>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="stat-item">
+                            <h3 id="tableCount">-</h3>
+                            <p>Tables</p>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="text-center mb-3">
-                            <i class="fas fa-shield-alt fa-2x text-success mb-2"></i>
-                            <h6>Rate Limiting</h6>
-                            <p class="text-muted">Prevents abuse with intelligent rate limiting</p>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-center mb-3">
-                            <i class="fas fa-user-shield fa-2x text-warning mb-2"></i>
-                            <h6>Secure File Uploads</h6>
-                            <p class="text-muted">Validated file types and secure processing</p>
+                    <div class="col-6">
+                        <div class="stat-item">
+                            <h3 id="queryCount">-</h3>
+                            <p>Queries</p>
                         </div>
                     </div>
                 </div>
@@ -104,29 +79,27 @@
 </div>
 
 <script>
-// Add some interactive elements
+// Load platform stats
 document.addEventListener('DOMContentLoaded', function() {
-    // Animate feature cards on scroll
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-    };
-
-    const observer = new IntersectionObserver(function(entries) {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
+    // Fetch table count
+    fetch('/tables')
+        .then(response => response.json())
+        .then(data => {
+            if (data.tables) {
+                document.getElementById('tableCount').textContent = data.tables.length;
             }
-        });
-    }, observerOptions);
-
-    document.querySelectorAll('.feature-card').forEach(card => {
-        card.style.opacity = '0';
-        card.style.transform = 'translateY(20px)';
-        card.style.transition = 'all 0.6s ease';
-        observer.observe(card);
-    });
+        })
+        .catch(error => console.error('Error loading tables:', error));
+    
+    // Fetch query history count
+    fetch('/history')
+        .then(response => response.json())
+        .then(data => {
+            if (data.history) {
+                document.getElementById('queryCount').textContent = data.history.length;
+            }
+        })
+        .catch(error => console.error('Error loading history:', error));
 });
 </script>
 {% endblock %}
