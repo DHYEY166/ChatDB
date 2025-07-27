@@ -91,10 +91,30 @@ class DatabaseConnection(db.Model):
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in flask_session:
-            flash('Please log in to access this page.', 'warning')
+        try:
+            if 'user_id' not in flask_session:
+                logger.info("User not logged in, redirecting to login")
+                flash('Please log in to access this page.', 'warning')
+                return redirect(url_for('login'))
+            
+            # Verify user still exists in database
+            user_id = flask_session.get('user_id')
+            user = User.query.get(user_id)
+            
+            if not user:
+                logger.warning(f"User {user_id} not found in database, clearing session")
+                flask_session.clear()
+                flash('Your session has expired. Please log in again.', 'warning')
+                return redirect(url_for('login'))
+            
+            logger.info(f"User {user.username} accessing protected page")
+            return f(*args, **kwargs)
+            
+        except Exception as e:
+            logger.error(f"Error in login_required decorator: {e}")
+            flash('An error occurred. Please try again.', 'error')
             return redirect(url_for('login'))
-        return f(*args, **kwargs)
+    
     return decorated_function
 
 def admin_required(f):
@@ -332,19 +352,45 @@ def login():
             username = request.form.get('username')
             password = request.form.get('password')
             
+            logger.info(f"Login attempt for username: {username}")
+            
+            # Validate input
+            if not username or not password:
+                flash('Username and password are required', 'error')
+                return render_template('login.html', title="Login")
+            
+            # Find user
             user = User.query.filter_by(username=username).first()
-            if user and user.check_password(password):
-                flask_session.permanent = True
-                flask_session['user_id'] = user.id
-                flask_session['username'] = user.username
-                user.last_login = datetime.utcnow()
-                db.session.commit()
-                flash('Login successful!', 'success')
-                return redirect(url_for('index'))
+            
+            if user:
+                logger.info(f"User found: {username}")
+                # Check password
+                if user.check_password(password):
+                    logger.info(f"Password check successful for {username}")
+                    
+                    # Set up session
+                    flask_session.permanent = True
+                    flask_session['user_id'] = user.id
+                    flask_session['username'] = user.username
+                    
+                    # Update last login
+                    user.last_login = datetime.utcnow()
+                    db.session.commit()
+                    
+                    logger.info(f"Login successful for {username}, user_id: {user.id}")
+                    flash('Login successful!', 'success')
+                    return redirect(url_for('index'))
+                else:
+                    logger.info(f"Password check failed for {username}")
+                    flash('Invalid username or password', 'error')
             else:
+                logger.info(f"User not found: {username}")
                 flash('Invalid username or password', 'error')
+                
         except Exception as e:
             logger.error(f"Login error: {e}")
+            logger.error(f"Error type: {type(e)}")
+            logger.error(f"Error details: {str(e)}")
             flash('An error occurred during login. Please try again.', 'error')
     
     return render_template('login.html', title="Login")
@@ -1007,6 +1053,20 @@ def login_test():
             "status": "error",
             "message": str(e)
         })
+
+@app.route('/auth-test')
+@login_required
+def auth_test():
+    """Test authentication - if you can see this, you're logged in"""
+    user_id = flask_session.get('user_id')
+    username = flask_session.get('username')
+    
+    return jsonify({
+        "status": "success",
+        "message": "Authentication working",
+        "user_id": user_id,
+        "username": username
+    })
 
 @app.errorhandler(404)
 def not_found_error(error):
