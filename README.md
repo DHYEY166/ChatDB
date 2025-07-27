@@ -1,6 +1,6 @@
 # ChatDB - Enhanced Database Management Platform
 
-**ChatDB** is a modern, interactive web-based application that simplifies database management and visualization. With enhanced security, AI-powered features, and a beautiful user interface, ChatDB makes database operations intuitive and efficient.
+**ChatDB** is a modern, interactive web-based application that simplifies database management and visualization. With enhanced security, AI-powered features using Hugging Face, and a beautiful user interface, ChatDB makes database operations intuitive and efficient.
 
 ![ChatDB Dashboard](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 ![Python](https://img.shields.io/badge/Python-3.8+-blue)
@@ -17,8 +17,8 @@
 - **SQL Injection Prevention**: Query validation and sanitization
 - **Password Hashing**: Secure password storage with Werkzeug
 
-### 🤖 AI-Powered Features
-- **Query Suggestions**: Get intelligent SQL query improvements
+### 🤖 AI-Powered Features (Hugging Face)
+- **Query Suggestions**: Get intelligent SQL query improvements using Hugging Face models
 - **Error Analysis**: AI-powered error explanations
 - **Smart Recommendations**: Context-aware database suggestions
 
@@ -71,7 +71,7 @@
 4. **Set environment variables**
    ```bash
    export SECRET_KEY="your-secret-key-here"
-   export OPENAI_API_KEY="your-openai-api-key"  # Optional
+   export HUGGINGFACE_API_KEY="your-huggingface-api-key"  # Optional
    ```
 
 5. **Run the application**
@@ -103,7 +103,7 @@
 
 4. **Set Environment Variables**
    - `SECRET_KEY`: Generate a random string
-   - `OPENAI_API_KEY`: Your OpenAI API key (optional)
+   - `HUGGINGFACE_API_KEY`: Your Hugging Face API key (optional)
 
 5. **Deploy!**
    Click "Create Web Service" and wait for deployment
@@ -127,7 +127,7 @@
 3. **Set environment variables**
    ```bash
    heroku config:set SECRET_KEY="your-secret-key"
-   heroku config:set OPENAI_API_KEY="your-openai-key"
+   heroku config:set HUGGINGFACE_API_KEY="your-huggingface-key"
    ```
 4. **Deploy**
    ```bash
@@ -170,7 +170,7 @@ ChatDB/
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | `SECRET_KEY` | Flask secret key | Yes | Auto-generated |
-| `OPENAI_API_KEY` | OpenAI API key for AI features | No | None |
+| `HUGGINGFACE_API_KEY` | Hugging Face API key for AI features | No | None |
 | `PORT` | Server port | No | 5000 |
 
 ### Database Support
@@ -197,7 +197,7 @@ ChatDB/
 - Report generation
 - Query history tracking
 
-### 🤖 AI Integration
+### 🤖 AI Integration (Hugging Face)
 - Query optimization suggestions
 - Error analysis and explanations
 - Smart database recommendations
@@ -270,7 +270,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Bootstrap** - CSS framework
 - **Chart.js** - Data visualization
 - **FontAwesome** - Icons
-- **OpenAI** - AI features
+- **Hugging Face** - AI features
 
 ---
 
@@ -286,7 +286,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### v2.0.0 (Current)
 - ✨ Added user authentication system
-- 🤖 Integrated AI-powered query suggestions
+- 🤖 Integrated Hugging Face AI-powered query suggestions
 - 📊 Enhanced analytics and dashboard
 - 🎨 Modernized UI with dark theme
 - 🔐 Improved security features

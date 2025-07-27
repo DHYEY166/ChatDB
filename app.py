@@ -4,7 +4,6 @@ from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 import pandas as pd
 import os
-import openai
 import logging
 import matplotlib
 import matplotlib.pyplot as plt
@@ -15,6 +14,7 @@ from datetime import datetime, timedelta
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import requests
 matplotlib.use('Agg')
 
 # Initialize Flask app
@@ -42,8 +42,8 @@ with app.app_context():
     SQLAlchemySession = sessionmaker(bind=engine)
     sqlalchemy_session = SQLAlchemySession()
 
-# OpenAI API Key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Hugging Face API Key
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -128,23 +128,41 @@ def log_query(query, query_type, execution_time=None, success=True, error_messag
     except Exception as e:
         logger.error(f"Error logging query: {e}")
 
-def get_ai_query_suggestion(user_query):
-    """Get AI-powered query suggestions"""
-    if not openai.api_key:
+def get_hf_query_suggestion(user_query):
+    """Get AI-powered query suggestions using Hugging Face"""
+    if not HUGGINGFACE_API_KEY:
         return None
     
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a SQL expert. Provide helpful suggestions for SQL queries. Keep responses concise and practical."},
-                {"role": "user", "content": f"Suggest improvements for this SQL query: {user_query}"}
-            ],
-            max_tokens=150
-        )
-        return response.choices[0].message.content
+        # Using Hugging Face Inference API with a text generation model
+        API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
+        headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
+        
+        # Create a prompt for SQL query improvement
+        prompt = f"Improve this SQL query for better performance and readability: {user_query}"
+        
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_length": 150,
+                "temperature": 0.7,
+                "do_sample": True
+            }
+        }
+        
+        response = requests.post(API_URL, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                return result[0].get('generated_text', 'No suggestion available.')
+            return result.get('generated_text', 'No suggestion available.')
+        else:
+            logger.error(f"Hugging Face API error: {response.status_code}")
+            return None
+            
     except Exception as e:
-        logger.error(f"Error getting AI suggestion: {e}")
+        logger.error(f"Error getting Hugging Face suggestion: {e}")
         return None
 
 def validate_sql_query(query):
@@ -470,7 +488,7 @@ def ai_suggest():
     if not query:
         return jsonify({"error": "Query is required"}), 400
     
-    suggestion = get_ai_query_suggestion(query)
+    suggestion = get_hf_query_suggestion(query)
     return jsonify({"suggestion": suggestion})
 
 @app.route('/history')

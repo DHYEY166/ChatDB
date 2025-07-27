@@ -9,5 +9,5 @@ services:
         value: 3.10.0
       - key: SECRET_KEY
         generateValue: true
-      - key: OPENAI_API_KEY
+      - key: HUGGINGFACE_API_KEY
         sync: false 
