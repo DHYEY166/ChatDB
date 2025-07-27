@@ -976,6 +976,38 @@ def session_test():
             "message": str(e)
         })
 
+@app.route('/login-test')
+def login_test():
+    """Test login functionality"""
+    try:
+        # Test if user exists
+        user = User.query.filter_by(username='testuser5').first()
+        
+        if user:
+            # Test password check
+            password_check = user.check_password('test123')
+            
+            return jsonify({
+                "status": "success",
+                "user_exists": True,
+                "username": user.username,
+                "email": user.email,
+                "password_check": password_check,
+                "user_id": user.id
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "User testuser5 not found",
+                "user_exists": False
+            })
+            
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        })
+
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('404.html'), 404
