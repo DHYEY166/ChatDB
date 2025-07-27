@@ -372,6 +372,11 @@ def login():
                     flask_session['user_id'] = user.id
                     flask_session['username'] = user.username
                     
+                    # Debug: Print session data
+                    logger.info(f"Session data after login: {dict(flask_session)}")
+                    logger.info(f"User ID in session: {flask_session.get('user_id')}")
+                    logger.info(f"Username in session: {flask_session.get('username')}")
+                    
                     # Update last login
                     user.last_login = datetime.utcnow()
                     db.session.commit()
@@ -1015,6 +1020,27 @@ def session_test():
                 "message": "Session read/write test failed"
             })
             
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        })
+
+@app.route('/session-debug')
+def session_debug():
+    """Debug session functionality"""
+    try:
+        # Get current session data
+        session_data = dict(flask_session)
+        
+        return jsonify({
+            "status": "success",
+            "session_data": session_data,
+            "user_id_in_session": flask_session.get('user_id'),
+            "username_in_session": flask_session.get('username'),
+            "session_id": flask_session.get('_id', 'No session ID')
+        })
+        
     except Exception as e:
         return jsonify({
             "status": "error",
