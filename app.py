@@ -609,8 +609,15 @@ def manage_page():
             log_query(query, 'error', execution_time, False, str(e))
             return jsonify({"error": str(e)}), 500
     
-    # Get query history
-    history = QueryHistory.query.filter_by(user_id=flask_session.get('user_id')).order_by(QueryHistory.created_at.desc()).limit(10).all()
+    # Get query history - simplified to avoid complex queries
+    try:
+        user_id = flask_session.get('user_id')
+        # Use a simple query to avoid complex SQLAlchemy operations
+        history = db.session.query(QueryHistory).filter(QueryHistory.user_id == user_id).order_by(QueryHistory.created_at.desc()).limit(10).all()
+    except Exception as e:
+        logger.error(f"Error fetching query history: {e}")
+        history = []
+    
     return render_template('manage.html', title="Manage Data", history=history)
 
 @app.route('/upload', methods=['POST'])
@@ -798,9 +805,13 @@ def query_history():
     page = request.args.get('page', 1, type=int)
     per_page = 20
     
-    history = QueryHistory.query.filter_by(user_id=flask_session.get('user_id'))\
-        .order_by(QueryHistory.created_at.desc())\
-        .paginate(page=page, per_page=per_page, error_out=False)
+    try:
+        user_id = flask_session.get('user_id')
+        # Use a simple query to avoid complex SQLAlchemy operations
+        history = db.session.query(QueryHistory).filter(QueryHistory.user_id == user_id).order_by(QueryHistory.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    except Exception as e:
+        logger.error(f"Error fetching query history: {e}")
+        history = None
     
     return render_template('history.html', title="Query History", history=history)
 
@@ -808,21 +819,32 @@ def query_history():
 @login_required
 def dashboard():
     # Get user statistics
-    total_queries = QueryHistory.query.filter_by(user_id=flask_session.get('user_id')).count()
-    successful_queries = QueryHistory.query.filter_by(user_id=flask_session.get('user_id'), success=True).count()
-    recent_queries = QueryHistory.query.filter_by(user_id=flask_session.get('user_id'))\
-        .order_by(QueryHistory.created_at.desc()).limit(5).all()
-    
-    # Get database connections
-    connections = DatabaseConnection.query.filter_by(user_id=flask_session.get('user_id')).all()
-    
-    stats = {
-        'total_queries': total_queries,
-        'successful_queries': successful_queries,
-        'success_rate': (successful_queries / total_queries * 100) if total_queries > 0 else 0,
-        'connections': len(connections),
-        'recent_queries': recent_queries
-    }
+    try:
+        user_id = flask_session.get('user_id')
+        # Use simple queries to avoid complex SQLAlchemy operations
+        total_queries = db.session.query(QueryHistory).filter(QueryHistory.user_id == user_id).count()
+        successful_queries = db.session.query(QueryHistory).filter(QueryHistory.user_id == user_id, QueryHistory.success == True).count()
+        recent_queries = db.session.query(QueryHistory).filter(QueryHistory.user_id == user_id).order_by(QueryHistory.created_at.desc()).limit(5).all()
+        
+        # Get database connections
+        connections = db.session.query(DatabaseConnection).filter(DatabaseConnection.user_id == user_id).all()
+        
+        stats = {
+            'total_queries': total_queries,
+            'successful_queries': successful_queries,
+            'success_rate': (successful_queries / total_queries * 100) if total_queries > 0 else 0,
+            'connections': len(connections),
+            'recent_queries': recent_queries
+        }
+    except Exception as e:
+        logger.error(f"Error fetching dashboard stats: {e}")
+        stats = {
+            'total_queries': 0,
+            'successful_queries': 0,
+            'success_rate': 0,
+            'connections': 0,
+            'recent_queries': []
+        }
     
     return render_template('dashboard.html', title="Dashboard", stats=stats)
 
