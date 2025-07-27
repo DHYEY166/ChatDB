@@ -733,6 +733,12 @@ def visualize_page():
         y_axis = request.json.get('y_axis')
         chart_type = request.json.get('chart_type', 'bar')
         
+        logger.info(f"Visualization request - Query: {query}, X: {x_axis}, Y: {y_axis}, Type: {chart_type}")
+        
+        # Validate input
+        if not query or not x_axis or not y_axis:
+            return jsonify({"error": "Query, x_axis, and y_axis are required"}), 400
+        
         # Validate query
         is_safe, message = validate_sql_query(query)
         if not is_safe:
@@ -746,6 +752,27 @@ def visualize_page():
 
             df = pd.DataFrame(rows)
             df.columns = result.keys()
+            
+            logger.info(f"DataFrame columns: {list(df.columns)}")
+            logger.info(f"DataFrame shape: {df.shape}")
+
+            # Check if required columns exist
+            if x_axis not in df.columns:
+                return jsonify({"error": f"Column '{x_axis}' not found in query result. Available columns: {list(df.columns)}"}), 400
+            
+            if y_axis not in df.columns:
+                return jsonify({"error": f"Column '{y_axis}' not found in query result. Available columns: {list(df.columns)}"}), 400
+
+            # Ensure y_axis contains numeric data
+            if not pd.api.types.is_numeric_dtype(df[y_axis]):
+                try:
+                    df[y_axis] = pd.to_numeric(df[y_axis], errors='coerce')
+                    # Remove rows with NaN values
+                    df = df.dropna(subset=[y_axis])
+                    if df.empty:
+                        return jsonify({"error": f"Column '{y_axis}' contains no numeric data"}), 400
+                except Exception as e:
+                    return jsonify({"error": f"Column '{y_axis}' must contain numeric data"}), 400
 
             plt.figure(figsize=(15, 8))
             plt.style.use('seaborn-v0_8')
@@ -782,17 +809,29 @@ def visualize_page():
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
 
-            plot_path = 'static/plot.png'
+            # Use /tmp directory for Render compatibility
+            plot_path = '/tmp/plot.png'
             plt.savefig(plot_path, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
+            
+            # Copy to static directory if it exists
+            static_plot_path = 'static/plot.png'
+            try:
+                import shutil
+                shutil.copy2(plot_path, static_plot_path)
+                plot_url = f"/{static_plot_path}"
+            except Exception as e:
+                logger.warning(f"Could not copy plot to static directory: {e}")
+                plot_url = f"/{plot_path}"
 
+            logger.info(f"Visualization created successfully: {plot_url}")
             return jsonify({
                 "message": "Visualization created successfully",
-                "plot_url": f"/{plot_path}"
+                "plot_url": plot_url
             })
             
     except Exception as e:
-        logger.error(f"Visualization error: {e}")
+        logger.error(f"Visualization error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/report', methods=['GET', 'POST'])
