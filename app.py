@@ -178,10 +178,57 @@ def validate_sql_query(query):
 def init_database():
     """Initialize database with proper error handling"""
     try:
+        # First, try to create tables manually to ensure they exist
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        
+        # Create tables manually
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS user (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(80) UNIQUE NOT NULL,
+                email VARCHAR(120) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_login DATETIME
+            )
+        ''')
+        
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS query_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                query TEXT NOT NULL,
+                query_type VARCHAR(50) NOT NULL,
+                execution_time FLOAT,
+                success BOOLEAN DEFAULT 1,
+                error_message TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES user (id)
+            )
+        ''')
+        
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS database_connection (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                name VARCHAR(100) NOT NULL,
+                connection_string TEXT NOT NULL,
+                database_type VARCHAR(50) NOT NULL,
+                is_active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES user (id)
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        logger.info("Database tables created manually")
+        
+        # Now try SQLAlchemy initialization
         with app.app_context():
-            # Create all tables
             db.create_all()
-            logger.info("Database initialized successfully")
+            logger.info("SQLAlchemy tables created successfully")
             
             # Test the database
             db.session.execute(text("SELECT 1"))
@@ -190,57 +237,8 @@ def init_database():
             
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
-        # Try to create database file manually
-        try:
-            import sqlite3
-            # Create the database file manually in /tmp
-            conn = sqlite3.connect(db_path)
-            
-            # Create tables manually if needed
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS user (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username VARCHAR(80) UNIQUE NOT NULL,
-                    email VARCHAR(120) UNIQUE NOT NULL,
-                    password_hash VARCHAR(255) NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    last_login DATETIME
-                )
-            ''')
-            
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS query_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    query TEXT NOT NULL,
-                    query_type VARCHAR(50) NOT NULL,
-                    execution_time FLOAT,
-                    success BOOLEAN DEFAULT 1,
-                    error_message TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES user (id)
-                )
-            ''')
-            
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS database_connection (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    name VARCHAR(100) NOT NULL,
-                    connection_string TEXT NOT NULL,
-                    database_type VARCHAR(50) NOT NULL,
-                    is_active BOOLEAN DEFAULT 1,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES user (id)
-                )
-            ''')
-            
-            conn.commit()
-            conn.close()
-            logger.info("Database file created manually with tables")
-        except Exception as e2:
-            logger.error(f"Manual database creation failed: {e2}")
-            raise e2
+        # If SQLAlchemy fails, we already have the tables from manual creation
+        logger.info("Using manually created tables")
 
 def reset_database():
     """Reset database for Render deployment"""
