@@ -372,19 +372,59 @@ def register():
                 flash('Password must be at least 6 characters long', 'error')
                 return render_template('register.html', title="Register")
             
-            # Test database connection first
+            # Try to create tables if they don't exist
             try:
-                db.session.execute(text("SELECT 1"))
+                # Test if user table exists
+                db.session.execute(text("SELECT 1 FROM user LIMIT 1"))
                 db.session.commit()
-                logger.info("Database connection test passed")
-            except Exception as db_error:
-                logger.error(f"Database connection test failed: {db_error}")
-                # Try to reset database
-                if reset_database():
-                    logger.info("Database reset successful, retrying registration")
-                else:
-                    flash('Database connection error. Please try again later.', 'error')
-                    return render_template('register.html', title="Register")
+                logger.info("User table exists")
+            except Exception as table_error:
+                logger.info(f"User table doesn't exist, creating tables: {table_error}")
+                # Create tables manually
+                import sqlite3
+                conn = sqlite3.connect(db_path)
+                
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS user (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username VARCHAR(80) UNIQUE NOT NULL,
+                        email VARCHAR(120) UNIQUE NOT NULL,
+                        password_hash VARCHAR(255) NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        last_login DATETIME
+                    )
+                ''')
+                
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS query_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER,
+                        query TEXT NOT NULL,
+                        query_type VARCHAR(50) NOT NULL,
+                        execution_time FLOAT,
+                        success BOOLEAN DEFAULT 1,
+                        error_message TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES user (id)
+                    )
+                ''')
+                
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS database_connection (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER,
+                        name VARCHAR(100) NOT NULL,
+                        connection_string TEXT NOT NULL,
+                        database_type VARCHAR(50) NOT NULL,
+                        is_active BOOLEAN DEFAULT 1,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES user (id)
+                    )
+                ''')
+                
+                conn.commit()
+                conn.close()
+                logger.info("Tables created successfully")
             
             # Check if user already exists
             existing_user = User.query.filter_by(username=username).first()
