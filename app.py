@@ -334,6 +334,7 @@ def login():
             
             user = User.query.filter_by(username=username).first()
             if user and user.check_password(password):
+                flask_session.permanent = True
                 flask_session['user_id'] = user.id
                 flask_session['username'] = user.username
                 user.last_login = datetime.utcnow()
