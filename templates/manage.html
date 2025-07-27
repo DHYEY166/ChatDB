@@ -1,132 +1,408 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Manage Data</h2>
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-cogs me-2"></i>Data Management</h4>
+            </div>
+            <div class="card-body">
+                <!-- File Upload Section -->
+                <div class="mb-4">
+                    <h5><i class="fas fa-upload me-2"></i>Upload Data</h5>
+                    <div class="file-upload-area" id="file-upload-area">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                        <h6>Drag & Drop Files Here</h6>
+                        <p class="text-muted">or click to browse</p>
+                        <input type="file" id="file-upload" class="d-none" accept=".csv,.json">
+                        <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('file-upload').click()">
+                            <i class="fas fa-folder-open me-2"></i>Choose File
+                        </button>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <label for="file-type" class="form-label">File Type</label>
+                        <select id="file-type" name="file_type" class="form-select">
+                            <option value="csv">CSV</option>
+                            <option value="json">JSON</option>
+                        </select>
+                    </div>
+                    
+                    <div id="upload-status" class="mt-3"></div>
+                </div>
 
-<!-- File Upload Section -->
-<div class="mb-4">
-    <h4>Upload Data</h4>
-    <form id="upload-form" enctype="multipart/form-data">
-        <label for="file-type" class="form-label">File Type</label>
-        <select id="file-type" name="file_type" class="form-select">
-            <option value="csv">CSV</option>
-            <option value="json">JSON</option>
-        </select>
+                <hr>
 
-        <label for="file-upload" class="form-label mt-3">Upload File</label>
-        <input type="file" id="file-upload" name="file" class="form-control">
+                <!-- Query Execution Section -->
+                <div>
+                    <h5><i class="fas fa-code me-2"></i>Execute Queries</h5>
+                    
+                    <!-- AI Query Suggestion -->
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <input type="text" id="query-intent" class="form-control" placeholder="Describe what you want to query (e.g., 'show me all users')">
+                            <button type="button" class="btn btn-outline-success" id="suggest-query">
+                                <i class="fas fa-magic me-2"></i>AI Suggest
+                            </button>
+                        </div>
+                    </div>
 
-        <button type="submit" class="btn btn-primary mt-3">Upload</button>
-    </form>
-    <div id="upload-status" class="mt-3"></div>
-</div>
+                    <div class="mb-3">
+                        <label for="query" class="form-label">SQL Query</label>
+                        <textarea id="query" class="form-control" rows="6" placeholder="Enter your SQL query here..."></textarea>
+                    </div>
 
-<!-- Query Execution Section -->
-<div>
-    <h4>Execute a Query</h4>
-    <form id="query-form" class="mb-3">
-        <label for="query" class="form-label mt-3">Query</label>
-        <textarea id="query" class="form-control" rows="5" placeholder="Enter your query here"></textarea>
+                    <div class="d-flex gap-2 mb-3">
+                        <button type="button" id="execute-query" class="btn btn-primary">
+                            <i class="fas fa-play me-2"></i>Execute Query
+                        </button>
+                        <button type="button" id="clear-query" class="btn btn-outline-secondary">
+                            <i class="fas fa-eraser me-2"></i>Clear
+                        </button>
+                        <button type="button" id="load-tables" class="btn btn-outline-info">
+                            <i class="fas fa-list me-2"></i>Show Tables
+                        </button>
+                    </div>
+                </div>
 
-        <button type="button" id="execute-query" class="btn btn-primary mt-3">Execute Query</button>
-    </form>
-</div>
+                <hr>
 
-<div>
-    <h4>Data Output:</h4>
-    <div id="data-output">
-        <!-- Tabular Output -->
-        <h5>Tabular Output:</h5>
-        <div id="table-output"></div>
+                <!-- Query History -->
+                <div>
+                    <h5><i class="fas fa-history me-2"></i>Recent Queries</h5>
+                    <div id="query-history" class="mb-3">
+                        <!-- Query history will be loaded here -->
+                    </div>
+                </div>
 
-        <!-- JSON Output -->
-        <h5>JSON Output:</h5>
-        <pre id="json-output"></pre>
+                <hr>
+
+                <!-- Data Output Section -->
+                <div>
+                    <h5><i class="fas fa-table me-2"></i>Query Results</h5>
+                    
+                    <!-- Results Summary -->
+                    <div id="results-summary" class="mb-3 d-none">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body text-center">
+                                        <h6>Rows</h6>
+                                        <h4 id="row-count">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body text-center">
+                                        <h6>Columns</h6>
+                                        <h4 id="column-count">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body text-center">
+                                        <h6>Execution Time</h6>
+                                        <h4 id="execution-time">0ms</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-warning text-white">
+                                    <div class="card-body text-center">
+                                        <h6>Status</h6>
+                                        <h4 id="query-status">Ready</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabular Output -->
+                    <div id="table-output" class="mb-4"></div>
+
+                    <!-- JSON Output -->
+                    <div id="json-output-container" class="d-none">
+                        <h6><i class="fas fa-code me-2"></i>JSON Output</h6>
+                        <pre id="json-output"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
-    // Handle File Upload
-    const uploadForm = document.querySelector('#upload-form');
-    uploadForm.addEventListener('submit', function (event) {
-        event.preventDefault();
-        const formData = new FormData(uploadForm);
+// File Upload Handling
+const fileUploadArea = document.getElementById('file-upload-area');
+const fileInput = document.getElementById('file-upload');
 
-        fetch('/upload', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            document.querySelector('#upload-status').textContent = data.message;
-        })
-        .catch(error => {
-            document.querySelector('#upload-status').textContent = `Error: ${error.message}`;
-        });
+fileUploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    fileUploadArea.classList.add('dragover');
+});
+
+fileUploadArea.addEventListener('dragleave', () => {
+    fileUploadArea.classList.remove('dragover');
+});
+
+fileUploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    fileUploadArea.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        fileInput.files = files;
+        handleFileUpload();
+    }
+});
+
+fileInput.addEventListener('change', handleFileUpload);
+
+function handleFileUpload() {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('file_type', document.getElementById('file-type').value);
+
+    showLoading();
+    showToast('Uploading', 'Processing your file...', 'info');
+
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast('Upload Failed', data.error, 'error');
+        } else {
+            showToast('Upload Success', data.message, 'success');
+            document.getElementById('upload-status').innerHTML = `
+                <div class="status-message status-success">
+                    <i class="fas fa-check-circle me-2"></i>${data.message}
+                    <br><small>Rows: ${data.row_count} | Columns: ${data.columns.length}</small>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showToast('Upload Error', 'Failed to upload file', 'error');
     });
+}
 
-    // Handle Query Execution
-    document.querySelector('#execute-query').addEventListener('click', function () {
-        const query = document.querySelector('#query').value;
-        const payload = { query: query };
+// Query Execution
+document.getElementById('execute-query').addEventListener('click', executeQuery);
+document.getElementById('clear-query').addEventListener('click', clearQuery);
+document.getElementById('load-tables').addEventListener('click', loadTables);
 
-        fetch('/manage', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                document.querySelector('#table-output').innerHTML = '';
-                document.querySelector('#json-output').textContent = `Error: ${data.error}`;
-            } else if (data.data) {
-                // Render tabular data if applicable
-                if (Array.isArray(data.data) && data.data.length > 0) {
-                    const table = document.createElement('table');
-                    table.className = "table table-bordered table-striped";
-                    const thead = document.createElement('thead');
-                    const tbody = document.createElement('tbody');
+function executeQuery() {
+    const query = document.getElementById('query').value.trim();
+    if (!query) {
+        showToast('Error', 'Please enter a query', 'error');
+        return;
+    }
 
-                    // Add table headers
-                    const headerRow = document.createElement('tr');
-                    Object.keys(data.data[0]).forEach(key => {
-                        const th = document.createElement('th');
-                        th.textContent = key;
-                        headerRow.appendChild(th);
-                    });
-                    thead.appendChild(headerRow);
+    const startTime = performance.now();
+    showLoading();
+    showToast('Executing', 'Running your query...', 'info');
 
-                    // Add table rows
-                    data.data.forEach(row => {
-                        const rowElement = document.createElement('tr');
-                        Object.values(row).forEach(value => {
-                            const td = document.createElement('td');
-                            td.textContent = value;
-                            rowElement.appendChild(td);
-                        });
-                        tbody.appendChild(rowElement);
-                    });
+    fetch('/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        const endTime = performance.now();
+        const executionTime = Math.round(endTime - startTime);
 
-                    table.appendChild(thead);
-                    table.appendChild(tbody);
-                    document.querySelector('#table-output').innerHTML = '';
-                    document.querySelector('#table-output').appendChild(table);
-                } else {
-                    document.querySelector('#table-output').innerHTML = 'No tabular data available.';
-                }
-
-                // Display JSON output
-                document.querySelector('#json-output').textContent = JSON.stringify(data.data, null, 2);
-            } else if (data.message) {
-                document.querySelector('#table-output').innerHTML = '';
-                document.querySelector('#json-output').textContent = data.message;
-            }
-        })
-        .catch(error => {
-            document.querySelector('#table-output').innerHTML = '';
-            document.querySelector('#json-output').textContent = `Error: ${error.message}`;
-        });
+        if (data.error) {
+            showToast('Query Error', data.error, 'error');
+            updateResultsSummary(0, 0, executionTime, 'Error');
+        } else {
+            showToast('Query Success', 'Query executed successfully', 'success');
+            displayResults(data, executionTime);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showToast('Error', 'Failed to execute query', 'error');
     });
+}
+
+function displayResults(data, executionTime) {
+    const tableOutput = document.getElementById('table-output');
+    const jsonOutput = document.getElementById('json-output');
+    const jsonContainer = document.getElementById('json-output-container');
+
+    // Clear previous results
+    tableOutput.innerHTML = '';
+    jsonContainer.classList.add('d-none');
+
+    if (data.data && data.data.length > 0) {
+        // Create table
+        const table = document.createElement('table');
+        table.className = 'table table-striped table-hover';
+        
+        const thead = document.createElement('thead');
+        const tbody = document.createElement('tbody');
+
+        // Headers
+        const headerRow = document.createElement('tr');
+        Object.keys(data.data[0]).forEach(key => {
+            const th = document.createElement('th');
+            th.textContent = key;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+
+        // Rows
+        data.data.forEach(row => {
+            const tr = document.createElement('tr');
+            Object.values(row).forEach(value => {
+                const td = document.createElement('td');
+                td.textContent = value !== null ? value : '';
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(thead);
+        table.appendChild(tbody);
+        tableOutput.appendChild(table);
+
+        // Update summary
+        updateResultsSummary(data.data.length, Object.keys(data.data[0]).length, executionTime, 'Success');
+    } else {
+        tableOutput.innerHTML = '<div class="alert alert-info">No data returned from query.</div>';
+        updateResultsSummary(0, 0, executionTime, 'No Data');
+    }
+
+    // Show JSON output
+    jsonOutput.textContent = JSON.stringify(data, null, 2);
+    jsonContainer.classList.remove('d-none');
+}
+
+function updateResultsSummary(rows, columns, executionTime, status) {
+    document.getElementById('results-summary').classList.remove('d-none');
+    document.getElementById('row-count').textContent = rows;
+    document.getElementById('column-count').textContent = columns;
+    document.getElementById('execution-time').textContent = executionTime + 'ms';
+    document.getElementById('query-status').textContent = status;
+}
+
+function clearQuery() {
+    document.getElementById('query').value = '';
+    document.getElementById('query-intent').value = '';
+    document.getElementById('table-output').innerHTML = '';
+    document.getElementById('json-output-container').classList.add('d-none');
+    document.getElementById('results-summary').classList.add('d-none');
+}
+
+function loadTables() {
+    showLoading();
+    fetch('/api/tables')
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast('Error', data.error, 'error');
+        } else {
+            let tablesInfo = 'Available Tables:\n\n';
+            data.tables.forEach(table => {
+                tablesInfo += `Table: ${table.name}\n`;
+                tablesInfo += `Columns: ${table.columns.join(', ')}\n\n`;
+            });
+            document.getElementById('query').value = tablesInfo;
+            showToast('Tables Loaded', `Found ${data.tables.length} tables`, 'success');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showToast('Error', 'Failed to load tables', 'error');
+    });
+}
+
+// AI Query Suggestion
+document.getElementById('suggest-query').addEventListener('click', function() {
+    const intent = document.getElementById('query-intent').value.trim();
+    if (!intent) {
+        showToast('Error', 'Please describe what you want to query', 'error');
+        return;
+    }
+
+    showLoading();
+    fetch('/api/suggest-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            intent: intent,
+            table_info: 'Available tables and their columns'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast('Suggestion Error', data.error, 'error');
+        } else {
+            document.getElementById('query').value = data.suggested_query;
+            showToast('Query Suggested', 'AI has generated a query for you', 'success');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showToast('Error', 'Failed to get query suggestion', 'error');
+    });
+});
+
+// Load Query History
+function loadQueryHistory() {
+    fetch('/api/query-history')
+    .then(response => response.json())
+    .then(data => {
+        if (data.history && data.history.length > 0) {
+            const historyContainer = document.getElementById('query-history');
+            historyContainer.innerHTML = '';
+            
+            data.history.forEach(item => {
+                const historyItem = document.createElement('div');
+                historyItem.className = `query-history-item ${item.success ? 'success' : 'error'}`;
+                historyItem.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <code class="text-sm">${item.query}</code>
+                            <br><small class="text-muted">${item.executed_at}</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="loadQuery('${item.query.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-arrow-up"></i>
+                        </button>
+                    </div>
+                `;
+                historyContainer.appendChild(historyItem);
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Failed to load query history:', error);
+    });
+}
+
+function loadQuery(query) {
+    document.getElementById('query').value = query;
+    showToast('Query Loaded', 'Query has been loaded into the editor', 'info');
+}
+
+// Load history on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadQueryHistory();
+});
 </script>
 {% endblock %}
