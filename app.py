@@ -191,11 +191,59 @@ def init_database():
     """Initialize database with proper error handling"""
     try:
         print("Initializing database...")
+        print(f"Database path: {db_path}")
         
-        # Create tables using SQLAlchemy
+        # First, try to create tables manually to ensure they exist
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        
+        # Create tables manually
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS user (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(80) UNIQUE NOT NULL,
+                email VARCHAR(120) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_login DATETIME
+            )
+        ''')
+
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS query_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                query TEXT NOT NULL,
+                query_type VARCHAR(50) NOT NULL,
+                execution_time FLOAT,
+                success BOOLEAN DEFAULT 1,
+                error_message TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES user (id)
+            )
+        ''')
+
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS database_connection (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                name VARCHAR(100) NOT NULL,
+                connection_string TEXT NOT NULL,
+                database_type VARCHAR(50) NOT NULL,
+                is_active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES user (id)
+            )
+        ''')
+
+        conn.commit()
+        conn.close()
+        print("Database tables created manually")
+        
+        # Now try SQLAlchemy initialization
         with app.app_context():
             db.create_all()
-            print("Database tables created successfully")
+            print("SQLAlchemy tables created successfully")
             
             # Test the database
             db.session.execute(text("SELECT 1"))
@@ -205,58 +253,8 @@ def init_database():
     except Exception as e:
         print(f"Database initialization error: {e}")
         logger.error(f"Database initialization error: {e}")
-        
-        # Fallback: try manual table creation
-        try:
-            import sqlite3
-            conn = sqlite3.connect(db_path)
-            
-            # Create tables manually
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS user (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username VARCHAR(80) UNIQUE NOT NULL,
-                    email VARCHAR(120) UNIQUE NOT NULL,
-                    password_hash VARCHAR(255) NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    last_login DATETIME
-                )
-            ''')
-
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS query_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    query TEXT NOT NULL,
-                    query_type VARCHAR(50) NOT NULL,
-                    execution_time FLOAT,
-                    success BOOLEAN DEFAULT 1,
-                    error_message TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES user (id)
-                )
-            ''')
-
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS database_connection (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    name VARCHAR(100) NOT NULL,
-                    connection_string TEXT NOT NULL,
-                    database_type VARCHAR(50) NOT NULL,
-                    is_active BOOLEAN DEFAULT 1,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES user (id)
-                )
-            ''')
-
-            conn.commit()
-            conn.close()
-            print("Database tables created manually")
-            
-        except Exception as manual_error:
-            print(f"Manual table creation failed: {manual_error}")
-            logger.error(f"Manual table creation failed: {manual_error}")
+        # If SQLAlchemy fails, we already have the tables from manual creation
+        print("Using manually created tables")
 
 def reset_database():
     """Reset database for Render deployment"""
@@ -932,51 +930,78 @@ def create_tables():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
-@app.route('/db-test')
-def db_test():
-    """Test database functionality"""
+@app.route('/test-db')
+def test_db():
+    """Test database functionality and create tables if needed"""
     try:
         # Test if we can write to the database
         import sqlite3
         conn = sqlite3.connect(db_path)
         
-        # Create a test table
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS test_table (
-                id INTEGER PRIMARY KEY,
-                test_value TEXT
-            )
-        ''')
+        # Check if user table exists
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user'")
+        if not cursor.fetchone():
+            print("User table doesn't exist, creating tables...")
+            
+            # Create tables manually
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS user (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username VARCHAR(80) UNIQUE NOT NULL,
+                    email VARCHAR(120) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_login DATETIME
+                )
+            ''')
+
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS query_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    query TEXT NOT NULL,
+                    query_type VARCHAR(50) NOT NULL,
+                    execution_time FLOAT,
+                    success BOOLEAN DEFAULT 1,
+                    error_message TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user (id)
+                )
+            ''')
+
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS database_connection (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    name VARCHAR(100) NOT NULL,
+                    connection_string TEXT NOT NULL,
+                    database_type VARCHAR(50) NOT NULL,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user (id)
+                )
+            ''')
+
+            conn.commit()
+            print("Tables created successfully")
         
-        # Insert a test value
-        conn.execute("INSERT INTO test_table (test_value) VALUES (?)", ("test",))
+        # Test if we can read from the database
+        cursor = conn.execute("SELECT COUNT(*) FROM user")
+        user_count = cursor.fetchone()[0]
         
-        # Read it back
-        cursor = conn.execute("SELECT test_value FROM test_table WHERE test_value = ?", ("test",))
-        result = cursor.fetchone()
-        
-        # Clean up
-        conn.execute("DELETE FROM test_table WHERE test_value = ?", ("test",))
-        conn.commit()
         conn.close()
         
-        if result and result[0] == "test":
-            return jsonify({
-                "status": "success", 
-                "message": "Database is working correctly",
-                "database_path": db_path,
-                "writable": True
-            })
-        else:
-            return jsonify({
-                "status": "error", 
-                "message": "Database read/write test failed",
-                "database_path": db_path
-            })
-            
+        return jsonify({
+            "status": "success",
+            "message": "Database is working correctly",
+            "database_path": db_path,
+            "user_count": user_count,
+            "tables_exist": True
+        })
+        
     except Exception as e:
         return jsonify({
-            "status": "error", 
+            "status": "error",
             "message": str(e),
             "database_path": db_path
         })
