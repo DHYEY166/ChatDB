@@ -860,6 +860,55 @@ def create_tables():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
+@app.route('/db-test')
+def db_test():
+    """Test database functionality"""
+    try:
+        # Test if we can write to the database
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        
+        # Create a test table
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS test_table (
+                id INTEGER PRIMARY KEY,
+                test_value TEXT
+            )
+        ''')
+        
+        # Insert a test value
+        conn.execute("INSERT INTO test_table (test_value) VALUES (?)", ("test",))
+        
+        # Read it back
+        cursor = conn.execute("SELECT test_value FROM test_table WHERE test_value = ?", ("test",))
+        result = cursor.fetchone()
+        
+        # Clean up
+        conn.execute("DELETE FROM test_table WHERE test_value = ?", ("test",))
+        conn.commit()
+        conn.close()
+        
+        if result and result[0] == "test":
+            return jsonify({
+                "status": "success", 
+                "message": "Database is working correctly",
+                "database_path": db_path,
+                "writable": True
+            })
+        else:
+            return jsonify({
+                "status": "error", 
+                "message": "Database read/write test failed",
+                "database_path": db_path
+            })
+            
+    except Exception as e:
+        return jsonify({
+            "status": "error", 
+            "message": str(e),
+            "database_path": db_path
+        })
+
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('404.html'), 404
