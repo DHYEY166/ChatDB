@@ -169,7 +169,18 @@ uploadForm.addEventListener('submit', function (event) {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return response.json();
+        } else {
+            // If not JSON, get the text and throw an error
+            return response.text().then(text => {
+                throw new Error(`Server returned non-JSON response: ${text.substring(0, 200)}...`);
+            });
+        }
+    })
     .then(data => {
         if (data.error) {
             statusDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>${data.error}</div>`;
@@ -179,6 +190,7 @@ uploadForm.addEventListener('submit', function (event) {
         }
     })
     .catch(error => {
+        console.error('Upload error:', error);
         statusDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: ${error.message}</div>`;
     });
 });

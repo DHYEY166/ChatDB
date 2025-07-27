@@ -621,81 +621,102 @@ def manage_page():
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload_file():
-    UPLOAD_FOLDER = 'uploads'
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
-
-    # Validate file type
-    allowed_extensions = {'csv', 'json', 'xlsx'}
-    if not file.filename.lower().endswith(tuple(allowed_extensions)):
-        return jsonify({"error": "File type not allowed"}), 400
-
-    table_name = os.path.splitext(file.filename)[0].lower()
-    table_name = ''.join(c if c.isalnum() else '_' for c in table_name)
-    if table_name[0].isdigit():
-        table_name = 'f_' + table_name
-
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(file_path)
-
     try:
-        if request.form.get('file_type') == 'json':
-            import json
-            with open(file_path, 'r') as f:
-                data = json.load(f)
-
-            def flatten_json(data):
-                flattened = []
-                for item in data:
-                    flat_item = {}
-                    for key, value in item.items():
-                        if isinstance(value, dict):
-                            for nested_key, nested_value in value.items():
-                                if isinstance(nested_value, (str, int, float, bool)):
-                                    flat_item[f"{key}_{nested_key}"] = nested_value
-                        elif isinstance(value, list):
-                            flat_item[key] = json.dumps(value)
-                        else:
-                            flat_item[key] = value
-                    flattened.append(flat_item)
-                return flattened
-
-            flattened_data = flatten_json(data if isinstance(data, list) else [data])
-            df = pd.DataFrame(flattened_data)
-        elif file.filename.lower().endswith('.xlsx'):
-            df = pd.read_excel(file_path)
-        else:
-            df = pd.read_csv(file_path)
-
-        with app.app_context():
-            inspector = db.inspect(db.engine)
-            if table_name in inspector.get_table_names():
-                db.session.execute(text(f'DROP TABLE IF EXISTS {table_name}'))
-                db.session.commit()
-
-        df.to_sql(table_name, db.engine, index=False, if_exists='replace')
+        # Use /tmp directory for Render compatibility
+        UPLOAD_FOLDER = '/tmp/uploads'
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         
-        # Log the upload
-        log_query(f"UPLOAD: {file.filename} -> {table_name}", 'upload', success=True)
+        logger.info("Upload request received")
         
-        return jsonify({
-            "message": f"File uploaded successfully as table '{table_name}'",
-            "table_name": table_name,
-            "columns": list(df.columns),
-            "row_count": len(df)
-        })
+        if 'file' not in request.files:
+            logger.error("No file part in request")
+            return jsonify({"error": "No file part"}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            logger.error("No selected file")
+            return jsonify({"error": "No selected file"}), 400
+
+        logger.info(f"Processing file: {file.filename}")
+
+        # Validate file type
+        allowed_extensions = {'csv', 'json', 'xlsx', 'xls'}
+        if not file.filename.lower().endswith(tuple(allowed_extensions)):
+            logger.error(f"Invalid file type: {file.filename}")
+            return jsonify({"error": "File type not allowed"}), 400
+
+        table_name = os.path.splitext(file.filename)[0].lower()
+        table_name = ''.join(c if c.isalnum() else '_' for c in table_name)
+        if table_name[0].isdigit():
+            table_name = 'f_' + table_name
+
+        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        logger.info(f"Saving file to: {file_path}")
+        file.save(file_path)
+
+        try:
+            if request.form.get('file_type') == 'json':
+                import json
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+
+                def flatten_json(data):
+                    flattened = []
+                    for item in data:
+                        flat_item = {}
+                        for key, value in item.items():
+                            if isinstance(value, dict):
+                                for nested_key, nested_value in value.items():
+                                    if isinstance(nested_value, (str, int, float, bool)):
+                                        flat_item[f"{key}_{nested_key}"] = nested_value
+                            elif isinstance(value, list):
+                                flat_item[key] = json.dumps(value)
+                            else:
+                                flat_item[key] = value
+                        flattened.append(flat_item)
+                    return flattened
+
+                flattened_data = flatten_json(data if isinstance(data, list) else [data])
+                df = pd.DataFrame(flattened_data)
+            elif file.filename.lower().endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(file_path)
+            else:
+                df = pd.read_csv(file_path)
+
+            logger.info(f"File loaded successfully. Shape: {df.shape}")
+
+            with app.app_context():
+                inspector = db.inspect(db.engine)
+                if table_name in inspector.get_table_names():
+                    logger.info(f"Dropping existing table: {table_name}")
+                    db.session.execute(text(f'DROP TABLE IF EXISTS {table_name}'))
+                    db.session.commit()
+
+            logger.info(f"Creating table: {table_name}")
+            df.to_sql(table_name, db.engine, index=False, if_exists='replace')
+            
+            # Log the upload
+            log_query(f"UPLOAD: {file.filename} -> {table_name}", 'upload', success=True)
+            
+            logger.info(f"Upload successful. Table: {table_name}, Rows: {len(df)}, Columns: {list(df.columns)}")
+            
+            return jsonify({
+                "message": f"File uploaded successfully as table '{table_name}'",
+                "table_name": table_name,
+                "columns": list(df.columns),
+                "row_count": len(df)
+            })
+        except Exception as e:
+            logger.error(f"Error processing file: {str(e)}")
+            log_query(f"UPLOAD: {file.filename}", 'upload', success=False, error_message=str(e))
+            return jsonify({"error": f"Error processing file: {str(e)}"}), 500
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logger.info(f"Cleaned up temporary file: {file_path}")
     except Exception as e:
-        log_query(f"UPLOAD: {file.filename}", 'upload', success=False, error_message=str(e))
-        return jsonify({"error": f"Error processing file: {str(e)}"}), 500
-    finally:
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        logger.error(f"Upload route error: {str(e)}")
+        return jsonify({"error": f"Upload failed: {str(e)}"}), 500
 
 @app.route('/visualize', methods=['GET', 'POST'])
 @login_required
