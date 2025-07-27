@@ -252,6 +252,66 @@ def init_database():
             logger.error(f"Manual database creation failed: {e2}")
             raise e2
 
+def reset_database():
+    """Reset database for Render deployment"""
+    try:
+        # Remove existing database file
+        if os.path.exists(db_path):
+            os.remove(db_path)
+            logger.info("Removed existing database file")
+        
+        # Create fresh database
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        
+        # Create tables with proper schema
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS user (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(80) UNIQUE NOT NULL,
+                email VARCHAR(120) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_login DATETIME
+            )
+        ''')
+        
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS query_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                query TEXT NOT NULL,
+                query_type VARCHAR(50) NOT NULL,
+                execution_time FLOAT,
+                success BOOLEAN DEFAULT 1,
+                error_message TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES user (id)
+            )
+        ''')
+        
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS database_connection (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                name VARCHAR(100) NOT NULL,
+                connection_string TEXT NOT NULL,
+                database_type VARCHAR(50) NOT NULL,
+                is_active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES user (id)
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        logger.info("Database reset successful")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Database reset failed: {e}")
+        return False
+
 @app.route('/health')
 def health_check():
     """Health check endpoint for deployment monitoring"""
@@ -324,6 +384,20 @@ def register():
                 flash('Password must be at least 6 characters long', 'error')
                 return render_template('register.html', title="Register")
             
+            # Test database connection first
+            try:
+                db.session.execute(text("SELECT 1"))
+                db.session.commit()
+                logger.info("Database connection test passed")
+            except Exception as db_error:
+                logger.error(f"Database connection test failed: {db_error}")
+                # Try to reset database
+                if reset_database():
+                    logger.info("Database reset successful, retrying registration")
+                else:
+                    flash('Database connection error. Please try again later.', 'error')
+                    return render_template('register.html', title="Register")
+            
             # Check if user already exists
             existing_user = User.query.filter_by(username=username).first()
             if existing_user:
@@ -360,7 +434,16 @@ def register():
             except:
                 pass
             
-            flash('An error occurred during registration. Please try again.', 'error')
+            # Try to reset database if it's a schema issue
+            if "no such table" in str(e).lower() or "table" in str(e).lower():
+                logger.info("Detected table issue, attempting database reset")
+                if reset_database():
+                    flash('Database was reset. Please try registration again.', 'info')
+                else:
+                    flash('Database error. Please try again later.', 'error')
+            else:
+                flash('An error occurred during registration. Please try again.', 'error')
+            
             return render_template('register.html', title="Register")
     
     return render_template('register.html', title="Register")
@@ -664,6 +747,37 @@ def dashboard():
     }
     
     return render_template('dashboard.html', title="Dashboard", stats=stats)
+
+@app.route('/reset-db')
+def reset_db():
+    """Reset database - for debugging only"""
+    try:
+        if reset_database():
+            return jsonify({"status": "success", "message": "Database reset successful"})
+        else:
+            return jsonify({"status": "error", "message": "Database reset failed"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/test-registration')
+def test_registration():
+    """Test registration with a sample user"""
+    try:
+        # Test user creation
+        test_user = User(username="test_user", email="test@example.com")
+        test_user.set_password("test123")
+        
+        db.session.add(test_user)
+        db.session.commit()
+        
+        # Clean up
+        db.session.delete(test_user)
+        db.session.commit()
+        
+        return jsonify({"status": "success", "message": "Registration test successful"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status": "error", "message": str(e)})
 
 @app.errorhandler(404)
 def not_found_error(error):
