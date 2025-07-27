@@ -1,355 +1,132 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h2 class="mb-4"><i class="fas fa-database"></i> Data Management</h2>
-    </div>
-</div>
+<h2>Manage Data</h2>
 
 <!-- File Upload Section -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="fas fa-upload"></i> Upload Data Files</h5>
-    </div>
-    <div class="card-body">
-        <div class="file-upload-area" id="drop-zone">
-            <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
-            <h5>Drag & Drop files here or click to browse</h5>
-            <p class="text-muted">Supports CSV, JSON, and Excel files (max 16MB)</p>
-            <input type="file" id="file-upload" class="d-none" accept=".csv,.json,.xlsx,.xls">
-            <button type="button" class="btn btn-primary" onclick="document.getElementById('file-upload').click()">
-                <i class="fas fa-folder-open"></i> Choose File
-            </button>
-        </div>
-        <div id="upload-status" class="mt-3"></div>
-    </div>
+<div class="mb-4">
+    <h4>Upload Data</h4>
+    <form id="upload-form" enctype="multipart/form-data">
+        <label for="file-type" class="form-label">File Type</label>
+        <select id="file-type" name="file_type" class="form-select">
+            <option value="csv">CSV</option>
+            <option value="json">JSON</option>
+        </select>
+
+        <label for="file-upload" class="form-label mt-3">Upload File</label>
+        <input type="file" id="file-upload" name="file" class="form-control">
+
+        <button type="submit" class="btn btn-primary mt-3">Upload</button>
+    </form>
+    <div id="upload-status" class="mt-3"></div>
 </div>
 
 <!-- Query Execution Section -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="fas fa-terminal"></i> Execute SQL Queries</h5>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-8">
-                <div class="form-group">
-                    <label for="query" class="form-label">SQL Query</label>
-                    <textarea id="query" class="form-control" rows="6" 
-                              placeholder="Enter your SQL query here...&#10;Example: SELECT * FROM users LIMIT 10"></textarea>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="form-group">
-                    <label class="form-label">Quick Actions</label>
-                    <div class="d-grid gap-2">
-                        <button type="button" class="btn btn-outline-info btn-sm" onclick="loadTables()">
-                            <i class="fas fa-list"></i> Show Tables
-                        </button>
-                        <button type="button" class="btn btn-outline-success btn-sm" onclick="loadHistory()">
-                            <i class="fas fa-history"></i> Query History
-                        </button>
-                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearQuery()">
-                            <i class="fas fa-eraser"></i> Clear Query
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="mt-3">
-            <button type="button" id="execute-query" class="btn btn-primary">
-                <i class="fas fa-play"></i> Execute Query
-            </button>
-            <div class="spinner-border spinner-border-sm d-none" id="query-spinner" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
-    </div>
+<div>
+    <h4>Execute a Query</h4>
+    <form id="query-form" class="mb-3">
+        <label for="query" class="form-label mt-3">Query</label>
+        <textarea id="query" class="form-control" rows="5" placeholder="Enter your query here"></textarea>
+
+        <button type="button" id="execute-query" class="btn btn-primary mt-3">Execute Query</button>
+    </form>
 </div>
 
-<!-- Query History Section -->
-<div class="card mb-4 d-none" id="history-section">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="fas fa-history"></i> Recent Queries</h5>
-    </div>
-    <div class="card-body">
-        <div id="query-history-list"></div>
-    </div>
-</div>
+<div>
+    <h4>Data Output:</h4>
+    <div id="data-output">
+        <!-- Tabular Output -->
+        <h5>Tabular Output:</h5>
+        <div id="table-output"></div>
 
-<!-- Tables Section -->
-<div class="card mb-4 d-none" id="tables-section">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="fas fa-table"></i> Available Tables</h5>
-    </div>
-    <div class="card-body">
-        <div id="tables-list"></div>
-    </div>
-</div>
-
-<!-- Data Output Section -->
-<div class="card">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Query Results</h5>
-    </div>
-    <div class="card-body">
-        <div id="data-output">
-            <div class="text-center text-muted">
-                <i class="fas fa-search fa-2x mb-2"></i>
-                <p>Execute a query to see results here</p>
-            </div>
-        </div>
+        <!-- JSON Output -->
+        <h5>JSON Output:</h5>
+        <pre id="json-output"></pre>
     </div>
 </div>
 
 <script>
-// File Upload Handling
-const dropZone = document.getElementById('drop-zone');
-const fileUpload = document.getElementById('file-upload');
-const uploadStatus = document.getElementById('upload-status');
+    // Handle File Upload
+    const uploadForm = document.querySelector('#upload-form');
+    uploadForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        const formData = new FormData(uploadForm);
 
-// Drag and drop functionality
-dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.style.borderColor = '#667eea';
-    dropZone.style.background = 'rgba(102, 126, 234, 0.1)';
-});
-
-dropZone.addEventListener('dragleave', (e) => {
-    e.preventDefault();
-    dropZone.style.borderColor = '#667eea';
-    dropZone.style.background = 'rgba(102, 126, 234, 0.05)';
-});
-
-dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.style.borderColor = '#667eea';
-    dropZone.style.background = 'rgba(102, 126, 234, 0.05)';
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        handleFileUpload(files[0]);
-    }
-});
-
-fileUpload.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-        handleFileUpload(e.target.files[0]);
-    }
-});
-
-function handleFileUpload(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    uploadStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Uploading file...</div>';
-    
-    fetch('/upload', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            uploadStatus.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> ${data.error}</div>`;
-        } else {
-            uploadStatus.innerHTML = `<div class="alert alert-success">
-                <i class="fas fa-check-circle"></i> ${data.message}<br>
-                <small>Table: ${data.table_name} | Rows: ${data.rows} | Columns: ${data.columns.join(', ')}</small>
-            </div>`;
-        }
-    })
-    .catch(error => {
-        uploadStatus.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> Upload failed: ${error.message}</div>`;
-    });
-}
-
-// Query Execution
-const executeBtn = document.getElementById('execute-query');
-const querySpinner = document.getElementById('query-spinner');
-const dataOutput = document.getElementById('data-output');
-
-executeBtn.addEventListener('click', function() {
-    const query = document.getElementById('query').value.trim();
-    
-    if (!query) {
-        showAlert('Please enter a query', 'warning');
-        return;
-    }
-    
-    executeBtn.disabled = true;
-    querySpinner.classList.remove('d-none');
-    
-    fetch('/manage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            showAlert(data.error, 'danger');
-        } else if (data.data) {
-            displayResults(data);
-        } else if (data.message) {
-            showAlert(data.message, 'success');
-        }
-    })
-    .catch(error => {
-        showAlert(`Query execution failed: ${error.message}`, 'danger');
-    })
-    .finally(() => {
-        executeBtn.disabled = false;
-        querySpinner.classList.add('d-none');
-    });
-});
-
-function displayResults(data) {
-    if (Array.isArray(data.data) && data.data.length > 0) {
-        const table = createDataTable(data.data);
-        dataOutput.innerHTML = `
-            <div class="mb-3">
-                <span class="badge bg-success">${data.count} rows returned</span>
-                <button class="btn btn-sm btn-outline-primary ms-2" onclick="exportToCSV()">
-                    <i class="fas fa-download"></i> Export CSV
-                </button>
-            </div>
-            <div class="table-responsive">
-                ${table.outerHTML}
-            </div>
-        `;
-        
-        // Store data for export
-        window.currentData = data.data;
-    } else {
-        dataOutput.innerHTML = '<div class="text-center text-muted"><p>No data returned</p></div>';
-    }
-}
-
-function createDataTable(data) {
-    const table = document.createElement('table');
-    table.className = 'table table-striped table-hover';
-    
-    const thead = document.createElement('thead');
-    const tbody = document.createElement('tbody');
-    
-    // Headers
-    const headerRow = document.createElement('tr');
-    Object.keys(data[0]).forEach(key => {
-        const th = document.createElement('th');
-        th.textContent = key;
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    
-    // Rows
-    data.forEach(row => {
-        const tr = document.createElement('tr');
-        Object.values(row).forEach(value => {
-            const td = document.createElement('td');
-            td.textContent = value !== null ? value : '';
-            tr.appendChild(td);
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.querySelector('#upload-status').textContent = data.message;
+        })
+        .catch(error => {
+            document.querySelector('#upload-status').textContent = `Error: ${error.message}`;
         });
-        tbody.appendChild(tr);
     });
-    
-    table.appendChild(thead);
-    table.appendChild(tbody);
-    return table;
-}
 
-function showAlert(message, type) {
-    dataOutput.innerHTML = `<div class="alert alert-${type}"><i class="fas fa-info-circle"></i> ${message}</div>`;
-}
+    // Handle Query Execution
+    document.querySelector('#execute-query').addEventListener('click', function () {
+        const query = document.querySelector('#query').value;
+        const payload = { query: query };
 
-function loadTables() {
-    fetch('/tables')
+        fetch('/manage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
         .then(response => response.json())
         .then(data => {
-            if (data.tables && data.tables.length > 0) {
-                const tablesList = document.getElementById('tables-list');
-                tablesList.innerHTML = data.tables.map(table => 
-                    `<div class="query-history-item">
-                        <strong>${table}</strong>
-                        <button class="btn btn-sm btn-outline-primary float-end" onclick="selectTable('${table}')">
-                            <i class="fas fa-eye"></i> View
-                        </button>
-                    </div>`
-                ).join('');
-                document.getElementById('tables-section').classList.remove('d-none');
-            } else {
-                showAlert('No tables found', 'info');
+            if (data.error) {
+                document.querySelector('#table-output').innerHTML = '';
+                document.querySelector('#json-output').textContent = `Error: ${data.error}`;
+            } else if (data.data) {
+                // Render tabular data if applicable
+                if (Array.isArray(data.data) && data.data.length > 0) {
+                    const table = document.createElement('table');
+                    table.className = "table table-bordered table-striped";
+                    const thead = document.createElement('thead');
+                    const tbody = document.createElement('tbody');
+
+                    // Add table headers
+                    const headerRow = document.createElement('tr');
+                    Object.keys(data.data[0]).forEach(key => {
+                        const th = document.createElement('th');
+                        th.textContent = key;
+                        headerRow.appendChild(th);
+                    });
+                    thead.appendChild(headerRow);
+
+                    // Add table rows
+                    data.data.forEach(row => {
+                        const rowElement = document.createElement('tr');
+                        Object.values(row).forEach(value => {
+                            const td = document.createElement('td');
+                            td.textContent = value;
+                            rowElement.appendChild(td);
+                        });
+                        tbody.appendChild(rowElement);
+                    });
+
+                    table.appendChild(thead);
+                    table.appendChild(tbody);
+                    document.querySelector('#table-output').innerHTML = '';
+                    document.querySelector('#table-output').appendChild(table);
+                } else {
+                    document.querySelector('#table-output').innerHTML = 'No tabular data available.';
+                }
+
+                // Display JSON output
+                document.querySelector('#json-output').textContent = JSON.stringify(data.data, null, 2);
+            } else if (data.message) {
+                document.querySelector('#table-output').innerHTML = '';
+                document.querySelector('#json-output').textContent = data.message;
             }
         })
-        .catch(error => showAlert(`Error loading tables: ${error.message}`, 'danger'));
-}
-
-function loadHistory() {
-    fetch('/history')
-        .then(response => response.json())
-        .then(data => {
-            if (data.history && data.history.length > 0) {
-                const historyList = document.getElementById('query-history-list');
-                historyList.innerHTML = data.history.map(item => 
-                    `<div class="query-history-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong>${item.query.substring(0, 50)}${item.query.length > 50 ? '...' : ''}</strong>
-                                <br><small class="text-muted">${item.timestamp} | ${item.result_count} results</small>
-                            </div>
-                            <button class="btn btn-sm btn-outline-primary" onclick="loadQuery('${item.query.replace(/'/g, "\\'")}')">
-                                <i class="fas fa-play"></i> Run
-                            </button>
-                        </div>
-                    </div>`
-                ).join('');
-                document.getElementById('history-section').classList.remove('d-none');
-            } else {
-                showAlert('No query history found', 'info');
-            }
-        })
-        .catch(error => showAlert(`Error loading history: ${error.message}`, 'danger'));
-}
-
-function selectTable(tableName) {
-    document.getElementById('query').value = `SELECT * FROM ${tableName} LIMIT 10`;
-}
-
-function loadQuery(query) {
-    document.getElementById('query').value = query;
-}
-
-function clearQuery() {
-    document.getElementById('query').value = '';
-}
-
-function exportToCSV() {
-    if (!window.currentData || window.currentData.length === 0) {
-        showAlert('No data to export', 'warning');
-        return;
-    }
-    
-    const headers = Object.keys(window.currentData[0]);
-    const csvContent = [
-        headers.join(','),
-        ...window.currentData.map(row => headers.map(header => `"${row[header]}"`).join(','))
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'query_results.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
-}
-
-// Keyboard shortcuts
-document.getElementById('query').addEventListener('keydown', function(e) {
-    if (e.ctrlKey && e.key === 'Enter') {
-        executeBtn.click();
-    }
-});
+        .catch(error => {
+            document.querySelector('#table-output').innerHTML = '';
+            document.querySelector('#json-output').textContent = `Error: ${error.message}`;
+        });
+    });
 </script>
 {% endblock %}

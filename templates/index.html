@@ -1,105 +1,123 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="hero-section text-center">
-    <h1 class="display-4 fw-bold text-primary mb-4">Welcome to ChatDB</h1>
-    <p class="lead mb-5">Your interactive database management and visualization platform</p>
-    
-    <div class="row g-4 mb-5">
-        <div class="col-md-3">
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <i class="fas fa-database"></i>
-                </div>
-                <h5>Connect</h5>
-                <p>Connect to SQLite, MySQL, or PostgreSQL databases</p>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <i class="fas fa-upload"></i>
-                </div>
-                <h5>Upload</h5>
-                <p>Upload CSV, JSON, or Excel files for analysis</p>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <i class="fas fa-chart-bar"></i>
-                </div>
-                <h5>Visualize</h5>
-                <p>Create beautiful charts and graphs from your data</p>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <i class="fas fa-file-alt"></i>
-                </div>
-                <h5>Reports</h5>
-                <p>Generate downloadable reports in CSV format</p>
-            </div>
-        </div>
-    </div>
-    
+<div class="text-center fade-in">
     <div class="row">
-        <div class="col-md-6">
-            <div class="quick-start-card">
-                <h4><i class="fas fa-rocket"></i> Quick Start</h4>
-                <ol class="text-start">
-                    <li>Go to <strong>Connect</strong> to set up your database</li>
-                    <li>Use <strong>Manage</strong> to upload files or run queries</li>
-                    <li>Visit <strong>Visualize</strong> to create charts</li>
-                    <li>Generate <strong>Reports</strong> for sharing</li>
-                </ol>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="stats-card">
-                <h4><i class="fas fa-chart-line"></i> Platform Stats</h4>
-                <div class="row text-center">
-                    <div class="col-6">
-                        <div class="stat-item">
-                            <h3 id="tableCount">-</h3>
-                            <p>Tables</p>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="stat-item">
-                            <h3 id="queryCount">-</h3>
-                            <p>Queries</p>
+        <div class="col-lg-8 mx-auto">
+            <h1 class="display-4 fw-bold mb-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                Welcome to ChatDB
+            </h1>
+            <p class="lead mb-5">Your intelligent database management and visualization platform</p>
+            
+            <div class="row g-4 mb-5">
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-database fa-3x text-primary"></i>
+                            </div>
+                            <h5 class="card-title">Database Management</h5>
+                            <p class="card-text">Connect to any SQL database and manage your data with ease. Execute queries, upload files, and visualize results.</p>
                         </div>
                     </div>
                 </div>
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-chart-bar fa-3x text-success"></i>
+                            </div>
+                            <h5 class="card-title">Data Visualization</h5>
+                            <p class="card-text">Create beautiful charts and graphs from your data. Support for bar charts, line charts, scatter plots, and pie charts.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row g-4 mb-5">
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-file-upload fa-3x text-info"></i>
+                            </div>
+                            <h5 class="card-title">File Upload</h5>
+                            <p class="card-text">Upload CSV, JSON, and Excel files directly to your database. Automatic table creation and data processing.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-file-alt fa-3x text-warning"></i>
+                            </div>
+                            <h5 class="card-title">Report Generation</h5>
+                            <p class="card-text">Generate comprehensive reports from your data. Export results in CSV format for further analysis.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info">
+                <h6 class="alert-heading">🚀 Quick Start</h6>
+                <p class="mb-0">Click "Get Started" to connect to your database and begin managing your data!</p>
+            </div>
+            
+            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <a href="{{ url_for('connect_page') }}" class="btn btn-primary btn-lg px-5">
+                    <i class="fas fa-rocket me-2"></i>Get Started
+                </a>
+                <a href="{{ url_for('manage_page') }}" class="btn btn-outline-primary btn-lg px-5">
+                    <i class="fas fa-database me-2"></i>Manage Data
+                </a>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-// Load platform stats
-document.addEventListener('DOMContentLoaded', function() {
-    // Fetch table count
-    fetch('/tables')
-        .then(response => response.json())
-        .then(data => {
-            if (data.tables) {
-                document.getElementById('tableCount').textContent = data.tables.length;
-            }
-        })
-        .catch(error => console.error('Error loading tables:', error));
-    
-    // Fetch query history count
-    fetch('/history')
-        .then(response => response.json())
-        .then(data => {
-            if (data.history) {
-                document.getElementById('queryCount').textContent = data.history.length;
-            }
-        })
-        .catch(error => console.error('Error loading history:', error));
-});
-</script>
+<!-- Features Section -->
+<div class="row mt-5">
+    <div class="col-12">
+        <h3 class="text-center mb-4">Key Features</h3>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-shield-alt text-success me-3"></i>
+                    <span>Secure database connections</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-bolt text-warning me-3"></i>
+                    <span>Fast query execution</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-mobile-alt text-info me-3"></i>
+                    <span>Responsive design</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-chart-line text-primary me-3"></i>
+                    <span>Interactive visualizations</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-file-csv text-secondary me-3"></i>
+                    <span>Multiple file formats</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-download text-danger me-3"></i>
+                    <span>Export capabilities</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

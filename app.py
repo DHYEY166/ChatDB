@@ -2,21 +2,24 @@ from flask import Flask, render_template, jsonify, request, session as flask_ses
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import SQLAlchemyError
 import pandas as pd
 import os
 import openai
 import logging
 import matplotlib
 import matplotlib.pyplot as plt
+import secrets
 import re
-import json
-from datetime import datetime
 from werkzeug.utils import secure_filename
+from datetime import datetime
+import json
 matplotlib.use('Agg')
 
 # Initialize Flask app
 app = Flask(__name__)
+
+# Security: Generate a secure secret key
+app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(32))
 
 # Ensure the data/ directory exists
 if not os.path.exists("data"):
@@ -24,7 +27,7 @@ if not os.path.exists("data"):
 
 # Configure the SQLite database
 db_path = os.path.abspath("data/example.db")
-print(f"Database Path: {db_path}")  # Debugging the database path
+print(f"Database Path: {db_path}")
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -36,38 +39,47 @@ with app.app_context():
     SQLAlchemySession = sessionmaker(bind=engine)
     sqlalchemy_session = SQLAlchemySession()
 
-# Flask session for storing query results
-app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
+# Flask session configuration
 app.config['SESSION_TYPE'] = 'filesystem'
 
 # OpenAI API Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Logging configuration
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {'csv', 'json', 'xlsx'}
+ALLOWED_EXTENSIONS = {'csv', 'json', 'xlsx', 'xls'}
 
 def allowed_file(filename):
+    """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def sanitize_sql_query(query):
-    """Basic SQL injection protection"""
-    # Remove comments
-    query = re.sub(r'--.*$', '', query, flags=re.MULTILINE)
-    query = re.sub(r'/\*.*?\*/', '', query, flags=re.DOTALL)
-    
-    # Check for dangerous keywords (basic protection)
+def validate_sql_query(query):
+    """Basic SQL injection prevention"""
     dangerous_keywords = ['DROP', 'DELETE', 'TRUNCATE', 'ALTER', 'CREATE', 'INSERT', 'UPDATE']
-    query_upper = query.upper()
+    query_upper = query.upper().strip()
     
-    for keyword in dangerous_keywords:
-        if keyword in query_upper and not query_upper.strip().startswith('SELECT'):
-            raise ValueError(f"Operation '{keyword}' is not allowed for security reasons")
+    # Check for dangerous keywords in non-SELECT queries
+    if not query_upper.startswith('SELECT'):
+        for keyword in dangerous_keywords:
+            if keyword in query_upper:
+                return False, f"Potentially dangerous SQL keyword '{keyword}' detected"
     
-    return query.strip()
+    return True, "Query is safe"
+
+def sanitize_table_name(name):
+    """Sanitize table name to prevent SQL injection"""
+    # Remove any non-alphanumeric characters except underscore
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    # Ensure it doesn't start with a number
+    if sanitized and sanitized[0].isdigit():
+        sanitized = 'tbl_' + sanitized
+    return sanitized or 'table'
 
 # Define a Sample Model
 class User(db.Model):
@@ -79,344 +91,343 @@ class User(db.Model):
     def __repr__(self):
         return f"<User {self.name}>"
 
-class QueryHistory(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    query = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    result_count = db.Column(db.Integer)
-    status = db.Column(db.String(20))  # success, error
-
 @app.route('/')
 def index():
-    return render_template('index.html', title="Home")
+    """Homepage with improved layout"""
+    return render_template('index.html', title="ChatDB - Database Management Tool")
 
 @app.route('/connect', methods=['GET', 'POST'])
 def connect_page():
+    """Database connection page with improved error handling"""
     if request.method == 'POST':
-        db_uri = request.json.get('db_uri')
-        if not db_uri:
-            return jsonify({"error": "SQL Database URI is required."}), 400
-        
-        # Validate URI format
-        if not db_uri.startswith(('sqlite://', 'mysql://', 'postgresql://')):
-            return jsonify({"error": "Invalid database URI format. Supported: sqlite://, mysql://, postgresql://"}), 400
-        
         try:
-            app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
-            db.engine.dispose()  # Close existing connections
-            with app.app_context():
-                db.create_all()
-                # Test the connection
-                db.session.execute(text("SELECT 1"))
-                db.session.commit()
-            return jsonify({"message": f"Successfully connected to database: {db_uri}"})
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "No data provided"}), 400
+            
+            db_uri = data.get('db_uri', '').strip()
+            if not db_uri:
+                return jsonify({"error": "Database URI is required"}), 400
+            
+            # Basic URI validation
+            if not (db_uri.startswith('sqlite://') or 
+                   db_uri.startswith('mysql://') or 
+                   db_uri.startswith('postgresql://')):
+                return jsonify({"error": "Invalid database URI format"}), 400
+            
+            # Test connection
+            try:
+                app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+                db.engine.dispose()  # Close existing connections
+                with app.app_context():
+                    db.create_all()
+                    # Test the connection
+                    db.session.execute(text("SELECT 1"))
+                    db.session.commit()
+                
+                return jsonify({
+                    "message": f"Successfully connected to database",
+                    "uri": db_uri
+                })
+            except Exception as e:
+                logger.error(f"Database connection error: {e}")
+                return jsonify({"error": f"Failed to connect to database: {str(e)}"}), 500
+                
         except Exception as e:
-            logger.error(f"Error connecting to SQL: {e}")
-            return jsonify({"error": f"Connection failed: {str(e)}"}), 500
+            logger.error(f"Connect page error: {e}")
+            return jsonify({"error": "An unexpected error occurred"}), 500
+    
     return render_template('connect.html', title="Connect to Database")
 
 @app.route('/manage', methods=['GET', 'POST'])
 def manage_page():
+    """Data management page with improved security"""
     if request.method == 'POST':
-        query = request.json.get('query')
-        if not query:
-            return jsonify({"error": "Query is required"}), 400
-        
         try:
-            # Sanitize the query
-            sanitized_query = sanitize_sql_query(query)
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "No data provided"}), 400
+            
+            query = data.get('query', '').strip()
+            if not query:
+                return jsonify({"error": "Query is required"}), 400
+            
+            # Validate query
+            is_safe, message = validate_sql_query(query)
+            if not is_safe:
+                return jsonify({"error": message}), 400
             
             with app.app_context():
-                # Execute the query using SQLAlchemy session
-                if sanitized_query.strip().lower().startswith("select"):
-                    result = db.session.execute(text(sanitized_query))
-                    # Convert results to list of dicts
-                    columns = result.keys()
-                    rows = [dict(zip(columns, row)) for row in result]
+                try:
+                    if query.strip().lower().startswith("select"):
+                        result = db.session.execute(text(query))
+                        columns = result.keys()
+                        rows = [dict(zip(columns, row)) for row in result]
+                        return jsonify({
+                            "data": rows,
+                            "row_count": len(rows),
+                            "column_count": len(columns) if rows else 0
+                        })
+                    else:
+                        # For non-SELECT queries, limit to safe operations
+                        if any(keyword in query.upper() for keyword in ['DROP', 'DELETE', 'TRUNCATE']):
+                            return jsonify({"error": "Destructive operations are not allowed"}), 400
+                        
+                        result = db.session.execute(text(query))
+                        db.session.commit()
+                        return jsonify({
+                            "message": "Query executed successfully",
+                            "affected_rows": result.rowcount if hasattr(result, 'rowcount') else 0
+                        })
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"Query execution error: {e}")
+                    return jsonify({"error": f"Query execution failed: {str(e)}"}), 500
                     
-                    # Save to query history
-                    history_entry = QueryHistory(
-                        query=sanitized_query,
-                        result_count=len(rows),
-                        status='success'
-                    )
-                    db.session.add(history_entry)
-                    db.session.commit()
-                    
-                    return jsonify({
-                        "data": rows,
-                        "count": len(rows),
-                        "columns": list(columns)
-                    })
-                else:
-                    db.session.execute(text(sanitized_query))
-                    db.session.commit()
-                    
-                    # Save to query history
-                    history_entry = QueryHistory(
-                        query=sanitized_query,
-                        result_count=0,
-                        status='success'
-                    )
-                    db.session.add(history_entry)
-                    db.session.commit()
-                    
-                    return jsonify({"message": "Query executed successfully."})
-        except ValueError as e:
-            return jsonify({"error": str(e)}), 400
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            logger.error(f"Database error: {e}")
-            return jsonify({"error": f"Database error: {str(e)}"}), 500
         except Exception as e:
-            db.session.rollback()
-            logger.error(f"Unexpected error: {e}")
-            return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+            logger.error(f"Manage page error: {e}")
+            return jsonify({"error": "An unexpected error occurred"}), 500
+    
     return render_template('manage.html', title="Manage Data")
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    UPLOAD_FOLDER = 'uploads'
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
-
-    if not allowed_file(file.filename):
-        return jsonify({"error": "File type not allowed. Please upload CSV, JSON, or Excel files."}), 400
-
-    # Secure the filename
-    filename = secure_filename(file.filename)
-    table_name = os.path.splitext(filename)[0].lower()
-    table_name = ''.join(c if c.isalnum() else '_' for c in table_name)
-    if table_name[0].isdigit():
-        table_name = 'f_' + table_name
-
-    file_path = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(file_path)
-
+    """File upload with improved security and validation"""
     try:
-        if filename.endswith('.json'):
-            with open(file_path, 'r') as f:
-                data = json.load(f)
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
 
-            def flatten_json(data):
-                flattened = []
-                for item in data:
-                    flat_item = {}
-                    for key, value in item.items():
-                        if isinstance(value, dict):
-                            # Extract important fields from nested dict
-                            for nested_key, nested_value in value.items():
-                                if isinstance(nested_value, (str, int, float, bool)):
-                                    flat_item[f"{key}_{nested_key}"] = nested_value
-                        elif isinstance(value, list):
-                            # Convert lists to string representation
-                            flat_item[key] = json.dumps(value)
-                        else:
-                            flat_item[key] = value
-                    flattened.append(flat_item)
-                return flattened
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
 
-            flattened_data = flatten_json(data if isinstance(data, list) else [data])
-            df = pd.DataFrame(flattened_data)
-        elif filename.endswith('.xlsx'):
-            df = pd.read_excel(file_path)
-        else:
-            df = pd.read_csv(file_path)
+        if not allowed_file(file.filename):
+            return jsonify({"error": "File type not allowed. Please upload CSV, JSON, or Excel files"}), 400
 
-        # Clean column names
-        df.columns = [str(col).strip().replace(' ', '_').lower() for col in df.columns]
-
-        with app.app_context():
-            inspector = db.inspect(db.engine)
-            if table_name in inspector.get_table_names():
-                db.session.execute(text(f'DROP TABLE IF EXISTS {table_name}'))
-                db.session.commit()
-
-        df.to_sql(table_name, db.engine, index=False, if_exists='replace')
+        # Secure filename
+        filename = secure_filename(file.filename)
+        file_type = request.form.get('file_type', 'csv').lower()
         
-        return jsonify({
-            "message": f"File uploaded successfully as table '{table_name}'",
-            "table_name": table_name,
-            "columns": list(df.columns),
-            "rows": len(df)
-        })
+        # Create upload directory
+        upload_folder = 'uploads'
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        file_path = os.path.join(upload_folder, filename)
+        file.save(file_path)
+
+        try:
+            # Process file based on type
+            if file_type == 'json':
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                def flatten_json(data):
+                    """Flatten nested JSON structures"""
+                    flattened = []
+                    for item in data:
+                        flat_item = {}
+                        for key, value in item.items():
+                            if isinstance(value, dict):
+                                for nested_key, nested_value in value.items():
+                                    if isinstance(nested_value, (str, int, float, bool)):
+                                        flat_item[f"{key}_{nested_key}"] = nested_value
+                            elif isinstance(value, list):
+                                flat_item[key] = json.dumps(value)
+                            else:
+                                flat_item[key] = value
+                        flattened.append(flat_item)
+                    return flattened
+
+                flattened_data = flatten_json(data if isinstance(data, list) else [data])
+                df = pd.DataFrame(flattened_data)
+            elif file_type in ['xlsx', 'xls']:
+                df = pd.read_excel(file_path)
+            else:  # CSV
+                df = pd.read_csv(file_path)
+
+            # Generate safe table name
+            table_name = sanitize_table_name(os.path.splitext(filename)[0].lower())
+
+            with app.app_context():
+                # Check if table exists and drop if needed
+                inspector = db.inspect(db.engine)
+                if table_name in inspector.get_table_names():
+                    db.session.execute(text(f'DROP TABLE IF EXISTS "{table_name}"'))
+                    db.session.commit()
+
+            # Save to database
+            df.to_sql(table_name, db.engine, index=False, if_exists='replace')
+            
+            return jsonify({
+                "message": f"File uploaded successfully as table '{table_name}'",
+                "table_name": table_name,
+                "columns": list(df.columns),
+                "row_count": len(df),
+                "file_size": os.path.getsize(file_path)
+            })
+            
+        except Exception as e:
+            logger.error(f"File processing error: {e}")
+            return jsonify({"error": f"Error processing file: {str(e)}"}), 500
+        finally:
+            # Clean up uploaded file
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                
     except Exception as e:
-        logger.error(f"File processing error: {e}")
-        return jsonify({"error": f"Error processing file: {str(e)}"}), 500
-    finally:
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        logger.error(f"Upload error: {e}")
+        return jsonify({"error": "An unexpected error occurred during upload"}), 500
 
 @app.route('/visualize', methods=['GET', 'POST'])
 def visualize_page():
+    """Data visualization with improved error handling"""
     if request.method == 'GET':
-        return render_template("visualize.html")
+        return render_template("visualize.html", title="Data Visualization")
     
     try:
-        query = request.json.get('query')
-        x_axis = request.json.get('x_axis')
-        y_axis = request.json.get('y_axis')
-        chart_type = request.json.get('chart_type', 'bar')
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
         
-        if not all([query, x_axis, y_axis]):
+        query = data.get('query', '').strip()
+        x_axis = data.get('x_axis', '').strip()
+        y_axis = data.get('y_axis', '').strip()
+        chart_type = data.get('chart_type', 'bar').lower()
+        
+        if not query or not x_axis or not y_axis:
             return jsonify({"error": "Query, X-axis, and Y-axis are required"}), 400
         
-        # Sanitize the query
-        sanitized_query = sanitize_sql_query(query)
+        # Validate query
+        is_safe, message = validate_sql_query(query)
+        if not is_safe:
+            return jsonify({"error": message}), 400
+        
+        # Validate chart type
+        valid_chart_types = ['bar', 'line', 'scatter', 'pie']
+        if chart_type not in valid_chart_types:
+            return jsonify({"error": f"Invalid chart type. Must be one of: {', '.join(valid_chart_types)}"}), 400
         
         with app.app_context():
-            result = db.session.execute(text(sanitized_query))
-            rows = result.fetchall()
-            if not rows:
-                return jsonify({"error": "No data returned from query"}), 404
+            try:
+                result = db.session.execute(text(query))
+                rows = result.fetchall()
+                if not rows:
+                    return jsonify({"error": "No data returned from query"}), 404
 
-            df = pd.DataFrame(rows)
-            df.columns = result.keys()
+                df = pd.DataFrame(rows)
+                df.columns = result.keys()
 
-            # Validate columns exist
-            if x_axis not in df.columns or y_axis not in df.columns:
-                return jsonify({"error": "Specified columns not found in query results"}), 400
+                # Validate columns exist
+                if x_axis not in df.columns or y_axis not in df.columns:
+                    return jsonify({"error": "Specified columns not found in query results"}), 400
 
-            plt.figure(figsize=(15, 8))
-            plt.style.use('seaborn-v0_8')
+                # Create visualization
+                plt.figure(figsize=(12, 8))
+                plt.style.use('default')  # Use default style for better appearance
 
-            if df[x_axis].dtype == 'object':
-                x_values = range(len(df[x_axis]))
-                if chart_type == "scatter":
-                    plt.scatter(x_values, df[y_axis], alpha=0.7, s=100)
-                elif chart_type == "line":
-                    plt.plot(x_values, df[y_axis], marker='o', linewidth=2, markersize=6)
-                else:  # bar chart
-                    bars = plt.bar(x_values, df[y_axis], alpha=0.8)
-                    # Add value labels on bars
-                    for bar in bars:
-                        height = bar.get_height()
-                        plt.text(bar.get_x() + bar.get_width()/2., height,
-                                f'{height:.1f}', ha='center', va='bottom')
-                plt.xticks(x_values, df[x_axis], rotation=45, ha='right')
-            else:
-                if chart_type == "scatter":
-                    plt.scatter(df[x_axis], df[y_axis], alpha=0.7, s=100)
-                elif chart_type == "line":
-                    plt.plot(df[x_axis], df[y_axis], marker='o', linewidth=2, markersize=6)
-                else:  # bar chart
-                    bars = plt.bar(df[x_axis], df[y_axis], alpha=0.8)
-                    # Add value labels on bars
-                    for bar in bars:
-                        height = bar.get_height()
-                        plt.text(bar.get_x() + bar.get_width()/2., height,
-                                f'{height:.1f}', ha='center', va='bottom')
+                if chart_type == "pie":
+                    plt.pie(df[y_axis], labels=df[x_axis], autopct='%1.1f%%')
+                    plt.title(f"Pie Chart: {y_axis} by {x_axis}")
+                else:
+                    if df[x_axis].dtype == 'object':
+                        x_values = range(len(df[x_axis]))
+                        if chart_type == "scatter":
+                            plt.scatter(x_values, df[y_axis], alpha=0.7)
+                        elif chart_type == "line":
+                            plt.plot(x_values, df[y_axis], marker='o')
+                        else:  # bar chart
+                            plt.bar(x_values, df[y_axis], alpha=0.8)
+                        plt.xticks(x_values, df[x_axis], rotation=45, ha='right')
+                    else:
+                        if chart_type == "scatter":
+                            plt.scatter(df[x_axis], df[y_axis], alpha=0.7)
+                        elif chart_type == "line":
+                            plt.plot(df[x_axis], df[y_axis], marker='o')
+                        else:  # bar chart
+                            plt.bar(df[x_axis], df[y_axis], alpha=0.8)
 
-            plt.xlabel(x_axis, fontsize=12, fontweight='bold')
-            plt.ylabel(y_axis, fontsize=12, fontweight='bold')
-            plt.title(f"{chart_type.capitalize()} Chart: {y_axis} vs {x_axis}", 
-                     fontsize=14, fontweight='bold', pad=20)
-            plt.grid(True, alpha=0.3)
-            plt.tight_layout()
+                    plt.xlabel(x_axis)
+                    plt.ylabel(y_axis)
+                    plt.title(f"{chart_type.capitalize()} Chart: {y_axis} vs {x_axis}")
 
-            plot_path = 'static/plot.png'
-            plt.savefig(plot_path, dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close()
+                plt.grid(True, alpha=0.3)
+                plt.tight_layout()
 
-            return jsonify({
-                "message": "Visualization created successfully",
-                "plot_url": f"/{plot_path}",
-                "data_points": len(df)
-            })
-            
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+                # Save plot with timestamp to avoid caching issues
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                plot_filename = f'plot_{timestamp}.png'
+                plot_path = os.path.join('static', plot_filename)
+                plt.savefig(plot_path, dpi=300, bbox_inches='tight', facecolor='white')
+                plt.close()
+
+                return jsonify({
+                    "message": "Visualization created successfully",
+                    "plot_url": f"/static/{plot_filename}",
+                    "data_points": len(df)
+                })
+                
+            except Exception as e:
+                logger.error(f"Visualization error: {e}")
+                return jsonify({"error": f"Error creating visualization: {str(e)}"}), 500
+                
     except Exception as e:
-        logger.error(f"Visualization error: {e}")
-        return jsonify({"error": f"Visualization error: {str(e)}"}), 500
+        logger.error(f"Visualize page error: {e}")
+        return jsonify({"error": "An unexpected error occurred"}), 500
 
 @app.route('/report', methods=['GET', 'POST'])
 def report_page():
+    """Report generation with improved validation"""
     if request.method == 'GET':
-        return render_template("report.html", message="Submit data using the form below.")
+        return render_template("report.html", title="Generate Reports")
 
-    data = request.json.get('data')
-    if not data:
-        return jsonify({"error": "No data provided"}), 400
-    
-    report_path = 'static/report.csv'
     try:
-        df = pd.DataFrame(data)
+        data = request.get_json()
+        if not data or 'data' not in data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        input_data = data['data']
+        
+        # Validate input data
+        if not isinstance(input_data, list):
+            return jsonify({"error": "Data must be a list of objects"}), 400
+        
+        if not input_data:
+            return jsonify({"error": "Data list cannot be empty"}), 400
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(input_data)
+        
+        # Generate report with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_filename = f'report_{timestamp}.csv'
+        report_path = os.path.join('static', report_filename)
+        
         df.to_csv(report_path, index=False)
+        
         return jsonify({
-            "message": "Report generated successfully.",
-            "report_url": report_path,
-            "rows": len(df),
-            "columns": list(df.columns)
+            "message": "Report generated successfully",
+            "report_url": f"/static/{report_filename}",
+            "row_count": len(df),
+            "column_count": len(df.columns)
         })
+        
     except Exception as e:
         logger.error(f"Report generation error: {e}")
-        return jsonify({"error": f"Report generation error: {str(e)}"}), 500
+        return jsonify({"error": f"Error generating report: {str(e)}"}), 500
 
-@app.route('/history')
-def query_history():
-    """Get query history"""
-    try:
-        with app.app_context():
-            history = QueryHistory.query.order_by(QueryHistory.timestamp.desc()).limit(20).all()
-            return jsonify({
-                "history": [
-                    {
-                        "id": h.id,
-                        "query": h.query,
-                        "timestamp": h.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                        "result_count": h.result_count,
-                        "status": h.status
-                    } for h in history
-                ]
-            })
-    except Exception as e:
-        logger.error(f"Error fetching history: {e}")
-        return jsonify({"error": str(e)}), 500
+@app.errorhandler(404)
+def not_found_error(error):
+    """Custom 404 error handler"""
+    return render_template('404.html', title="Page Not Found"), 404
 
-@app.route('/tables')
-def get_tables():
-    """Get list of available tables"""
-    try:
-        with app.app_context():
-            inspector = db.inspect(db.engine)
-            tables = inspector.get_table_names()
-            return jsonify({"tables": tables})
-    except Exception as e:
-        logger.error(f"Error fetching tables: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/table/<table_name>')
-def get_table_info(table_name):
-    """Get table structure and sample data"""
-    try:
-        with app.app_context():
-            inspector = db.inspect(db.engine)
-            if table_name not in inspector.get_table_names():
-                return jsonify({"error": "Table not found"}), 404
-            
-            columns = inspector.get_columns(table_name)
-            sample_query = f"SELECT * FROM {table_name} LIMIT 5"
-            result = db.session.execute(text(sample_query))
-            sample_data = [dict(zip(result.keys(), row)) for row in result]
-            
-            return jsonify({
-                "table_name": table_name,
-                "columns": [{"name": col["name"], "type": str(col["type"])} for col in columns],
-                "sample_data": sample_data
-            })
-    except Exception as e:
-        logger.error(f"Error fetching table info: {e}")
-        return jsonify({"error": str(e)}), 500
+@app.errorhandler(500)
+def internal_error(error):
+    """Custom 500 error handler"""
+    db.session.rollback()
+    return render_template('500.html', title="Server Error"), 500
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # Initialize database tables
+        db.create_all()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
