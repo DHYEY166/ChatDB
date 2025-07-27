@@ -627,6 +627,9 @@ def upload_file():
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         
         logger.info("Upload request received")
+        logger.info(f"Request headers: {dict(request.headers)}")
+        logger.info(f"Request form data: {dict(request.form)}")
+        logger.info(f"Request files: {list(request.files.keys())}")
         
         if 'file' not in request.files:
             logger.error("No file part in request")
