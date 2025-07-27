@@ -909,6 +909,42 @@ def db_test():
             "database_path": db_path
         })
 
+@app.route('/check-users')
+def check_users():
+    """Check if users exist in database - for debugging"""
+    try:
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        
+        # Check if user table exists
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user'")
+        if not cursor.fetchone():
+            return jsonify({"status": "error", "message": "User table does not exist"})
+        
+        # Get all users
+        cursor = conn.execute("SELECT id, username, email, created_at FROM user")
+        users = cursor.fetchall()
+        
+        conn.close()
+        
+        user_list = []
+        for user in users:
+            user_list.append({
+                "id": user[0],
+                "username": user[1],
+                "email": user[2],
+                "created_at": user[3]
+            })
+        
+        return jsonify({
+            "status": "success",
+            "user_count": len(user_list),
+            "users": user_list
+        })
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('404.html'), 404
