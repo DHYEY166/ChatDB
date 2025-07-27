@@ -767,6 +767,59 @@ def test_registration():
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)})
 
+@app.route('/create-tables')
+def create_tables():
+    """Manually create tables - for debugging"""
+    try:
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        
+        # Create tables manually
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS user (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(80) UNIQUE NOT NULL,
+                email VARCHAR(120) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_login DATETIME
+            )
+        ''')
+        
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS query_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                query TEXT NOT NULL,
+                query_type VARCHAR(50) NOT NULL,
+                execution_time FLOAT,
+                success BOOLEAN DEFAULT 1,
+                error_message TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES user (id)
+            )
+        ''')
+        
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS database_connection (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                name VARCHAR(100) NOT NULL,
+                connection_string TEXT NOT NULL,
+                database_type VARCHAR(50) NOT NULL,
+                is_active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES user (id)
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"status": "success", "message": "Tables created successfully"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('404.html'), 404
@@ -779,6 +832,9 @@ def internal_error(error):
 
 if __name__ == '__main__':
     # Initialize database on startup
+    print("Starting ChatDB application...")
+    print(f"Database path: {db_path}")
     init_database()
+    print("Database initialization complete")
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
