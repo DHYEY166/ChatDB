@@ -25,17 +25,10 @@ app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(32))
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 
-# Ensure the data/ directory exists
-if not os.path.exists("data"):
-    os.makedirs("data")
-
-# Configure the SQLite database - use a path that works on Render
-# On Render, we need to use a path that's writable
-db_path = os.path.join(os.getcwd(), "data", "example.db")
+# Configure the SQLite database - use /tmp for Render (writable location)
+# On Render, /tmp is writable, other locations may be read-only
+db_path = "/tmp/chatdb.db"
 print(f"Database Path: {db_path}")
-
-# Ensure the data directory exists
-os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -185,9 +178,6 @@ def validate_sql_query(query):
 def init_database():
     """Initialize database with proper error handling"""
     try:
-        # Ensure the database directory exists
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        
         with app.app_context():
             # Create all tables
             db.create_all()
@@ -203,7 +193,7 @@ def init_database():
         # Try to create database file manually
         try:
             import sqlite3
-            # Create the database file manually
+            # Create the database file manually in /tmp
             conn = sqlite3.connect(db_path)
             
             # Create tables manually if needed
