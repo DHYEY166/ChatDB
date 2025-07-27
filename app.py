@@ -29,9 +29,14 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 if not os.path.exists("data"):
     os.makedirs("data")
 
-# Configure the SQLite database
-db_path = os.path.abspath("data/example.db")
+# Configure the SQLite database - use a path that works on Render
+# On Render, we need to use a path that's writable
+db_path = os.path.join(os.getcwd(), "data", "example.db")
 print(f"Database Path: {db_path}")
+
+# Ensure the data directory exists
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -180,19 +185,72 @@ def validate_sql_query(query):
 def init_database():
     """Initialize database with proper error handling"""
     try:
+        # Ensure the database directory exists
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        
         with app.app_context():
+            # Create all tables
             db.create_all()
             logger.info("Database initialized successfully")
+            
+            # Test the database
+            db.session.execute(text("SELECT 1"))
+            db.session.commit()
+            logger.info("Database connection test successful")
+            
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
         # Try to create database file manually
         try:
             import sqlite3
+            # Create the database file manually
             conn = sqlite3.connect(db_path)
+            
+            # Create tables manually if needed
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS user (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username VARCHAR(80) UNIQUE NOT NULL,
+                    email VARCHAR(120) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_login DATETIME
+                )
+            ''')
+            
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS query_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    query TEXT NOT NULL,
+                    query_type VARCHAR(50) NOT NULL,
+                    execution_time FLOAT,
+                    success BOOLEAN DEFAULT 1,
+                    error_message TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user (id)
+                )
+            ''')
+            
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS database_connection (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    name VARCHAR(100) NOT NULL,
+                    connection_string TEXT NOT NULL,
+                    database_type VARCHAR(50) NOT NULL,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user (id)
+                )
+            ''')
+            
+            conn.commit()
             conn.close()
-            logger.info("Database file created manually")
+            logger.info("Database file created manually with tables")
         except Exception as e2:
             logger.error(f"Manual database creation failed: {e2}")
+            raise e2
 
 @app.route('/health')
 def health_check():
@@ -251,6 +309,8 @@ def register():
             email = request.form.get('email')
             password = request.form.get('password')
             
+            logger.info(f"Registration attempt for username: {username}, email: {email}")
+            
             # Validate input
             if not username or not email or not password:
                 flash('All fields are required', 'error')
@@ -265,26 +325,41 @@ def register():
                 return render_template('register.html', title="Register")
             
             # Check if user already exists
-            if User.query.filter_by(username=username).first():
+            existing_user = User.query.filter_by(username=username).first()
+            if existing_user:
                 flash('Username already exists', 'error')
                 return render_template('register.html', title="Register")
             
-            if User.query.filter_by(email=email).first():
+            existing_email = User.query.filter_by(email=email).first()
+            if existing_email:
                 flash('Email already registered', 'error')
                 return render_template('register.html', title="Register")
             
             # Create new user
             user = User(username=username, email=email)
             user.set_password(password)
+            
+            logger.info(f"Adding user to database: {username}")
             db.session.add(user)
+            
+            logger.info("Committing user to database")
             db.session.commit()
             
+            logger.info(f"User {username} registered successfully")
             flash('Registration successful! Please log in.', 'success')
             return redirect(url_for('login'))
             
         except Exception as e:
             logger.error(f"Registration error: {e}")
-            db.session.rollback()
+            logger.error(f"Error type: {type(e)}")
+            logger.error(f"Error details: {str(e)}")
+            
+            # Rollback any database changes
+            try:
+                db.session.rollback()
+            except:
+                pass
+            
             flash('An error occurred during registration. Please try again.', 'error')
             return render_template('register.html', title="Register")
     
