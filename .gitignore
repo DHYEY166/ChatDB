@@ -55,10 +55,21 @@ Thumbs.db
 *.log
 logs/
 
-# Database
+# Database - Comprehensive exclusions
 *.db
 *.sqlite
 *.sqlite3
+*.db-journal
+*.sqlite-journal
+*.sqlite3-journal
+data/
+instance/
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3-shm
+*.sqlite3-wal
 
 # Temporary files
 *.tmp
@@ -72,3 +83,12 @@ uploads/
 # Plots
 *.png
 plot.png
+
+# Sensitive files
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.json
+config.json
+credentials.json
