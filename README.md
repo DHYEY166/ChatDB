@@ -7,48 +7,48 @@
 
 A modern, web-based database management and visualization platform built with Flask. ChatDB allows users to upload data, execute SQL queries, create interactive visualizations, and leverage AI-powered query suggestions.
 
-## 🌟 Features
+## Features
 
-### 📊 Data Management
+### Data Management
 - **Multi-format Support**: Upload CSV, JSON, and Excel files
 - **SQL Query Execution**: Execute SELECT queries with real-time results
 - **Data Validation**: Built-in SQL injection prevention and query validation
 - **Query History**: Track and review all executed queries
 
-### 📈 Visualization
+### Visualization
 - **Interactive Charts**: Create bar charts, line charts, and scatter plots
 - **Dynamic Plotting**: Automatic data type detection and formatting
 - **Export Capabilities**: Download visualizations as high-resolution images
 - **Real-time Updates**: Instant chart generation from query results
 
-### 🤖 AI Integration
+### AI Integration
 - **Smart Suggestions**: AI-powered SQL query suggestions using Hugging Face
 - **Query Optimization**: Get intelligent recommendations for better queries
 - **Error Analysis**: AI assistance for debugging query issues
 
-### 🔐 User Management
+### User Management
 - **Secure Authentication**: User registration and login system
 - **Session Management**: Persistent user sessions across the application
 - **User Dashboard**: Personalized statistics and activity tracking
 - **Multi-user Support**: Isolated data and queries per user
 
-### 🎨 Modern Interface
+### Modern Interface
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
 - **Bootstrap UI**: Clean, modern interface with intuitive navigation
 - **Real-time Feedback**: Instant notifications and status updates
 - **Dark Theme**: Professional dark mode interface
 
-## 🚀 Live Demo
+## Live Demo
 
-**🌐 Application URL**: [https://chatdb-hcm5.onrender.com](https://chatdb-hcm5.onrender.com)
+**Application URL**: [https://chatdb-hcm5.onrender.com](https://chatdb-hcm5.onrender.com)
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Python 3.10 or higher
 - pip (Python package installer)
 - Git
 
-## 🛠️ Installation
+## Installation
 
 ### Local Development
 
@@ -83,7 +83,7 @@ A modern, web-based database management and visualization platform built with Fl
 6. **Access the application**
    Open your browser and navigate to `http://localhost:5000`
 
-## 🚀 Deployment
+## Deployment
 
 ### Render (Recommended)
 
@@ -120,7 +120,7 @@ heroku create your-app-name
 git push heroku main
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ChatDB/
@@ -144,7 +144,7 @@ ChatDB/
 └── README.md          # This file
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -162,7 +162,7 @@ The application uses SQLite by default, which is perfect for development and sma
 - **MySQL**: For enterprise environments
 - **Cloud Databases**: AWS RDS, Google Cloud SQL, etc.
 
-## 🎯 Usage
+## Usage
 
 ### Getting Started
 
@@ -189,7 +189,7 @@ FROM table1 t1
 JOIN table2 t2 ON t1.id = t2.id;
 ```
 
-## 🔒 Security Features
+## Security Features
 
 - **SQL Injection Prevention**: Query validation and sanitization
 - **Input Validation**: Comprehensive input checking
@@ -197,7 +197,7 @@ JOIN table2 t2 ON t1.id = t2.id;
 - **Error Handling**: Safe error messages without exposing internals
 - **File Upload Security**: File type and size validation
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -205,11 +205,11 @@ JOIN table2 t2 ON t1.id = t2.id;
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **Flask**: Web framework
 - **Bootstrap**: UI framework
@@ -218,7 +218,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Hugging Face**: AI integration
 - **Render**: Hosting platform
 
-## 📞 Support
+## Support
 
 If you encounter any issues or have questions:
 
@@ -228,5 +228,5 @@ If you encounter any issues or have questions:
 
 ---
 
-**Made with ❤️ by the ChatDB Team**
+**Made by the ChatDB Team**
 
