@@ -8,10 +8,15 @@ from sqlalchemy import text
 
 from extensions import db
 
+_log_handlers = [logging.StreamHandler()]
+_log_file = os.getenv('LOG_FILE')
+if _log_file:
+    _log_handlers.append(logging.FileHandler(_log_file))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s %(name)s %(levelname)s %(message)s',
-    handlers=[logging.FileHandler('app.log'), logging.StreamHandler()],
+    handlers=_log_handlers,
 )
 logger = logging.getLogger(__name__)
 
