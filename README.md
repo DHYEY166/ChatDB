@@ -42,6 +42,8 @@ A modern, web-based database management and visualization platform built with Fl
 
 **Application URL**: [https://chatdb-hcm5.onrender.com](https://chatdb-hcm5.onrender.com)
 
+> **Note**: Hosted on Render's free tier — the first request after a period of inactivity may take 30–60 seconds while the instance wakes up.
+
 ## Prerequisites
 
 - Python 3.10 or higher
@@ -124,25 +126,24 @@ git push heroku main
 
 ```
 ChatDB/
-├── app.py                 # Main Flask application
+├── app.py                 # App factory (create_app)
+├── extensions.py          # SQLAlchemy instance
+├── models.py              # ORM models (User, QueryHistory, DatabaseConnection)
+├── utils.py               # Shared helpers (validate_sql, login_required, HF suggest)
+├── blueprints/
+│   ├── auth.py            # /login  /register  /logout
+│   ├── data.py            # /manage  /upload  /connect  /history
+│   ├── visualize.py       # /visualize  /report
+│   └── ai.py              # /ai-suggest
+├── tests/
+│   ├── conftest.py        # pytest fixtures
+│   └── test_routes.py     # Route and utility tests
+├── templates/             # Jinja2 HTML templates
+├── static/                # CSS and JS assets
 ├── requirements.txt       # Python dependencies
-├── render.yaml           # Render deployment configuration
-├── deploy.sh            # Deployment automation script
-├── .env.example         # Environment variable template
-├── templates/           # HTML templates
-│   ├── base.html       # Base template
-│   ├── index.html      # Home page
-│   ├── login.html      # Login page
-│   ├── register.html   # Registration page
-│   ├── dashboard.html  # User dashboard
-│   ├── manage.html     # Data management
-│   ├── visualize.html  # Visualization page
-│   ├── history.html    # Query history
-│   └── connect.html    # Database connection
-├── static/             # Static assets
-│   ├── css/           # Stylesheets
-│   └── js/            # JavaScript files
-└── README.md          # This file
+├── render.yaml            # Render deployment config
+├── deploy.sh              # Deploy helper script
+└── .env.example           # Environment variable template
 ```
 
 ## Configuration
@@ -197,6 +198,15 @@ JOIN table2 t2 ON t1.id = t2.id;
 - **Session Security**: Secure session management
 - **Error Handling**: Safe error messages without exposing internals
 - **File Upload Security**: File type and size validation
+
+## Running Tests
+
+```bash
+pip install -r requirements.txt
+pytest tests/
+```
+
+---
 
 ## Contributing
 

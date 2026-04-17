@@ -130,16 +130,16 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    <a href="{{ url_for('connect_page') }}" class="btn btn-outline-primary">
+                    <a href="{{ url_for('data.connect_page') }}" class="btn btn-outline-primary">
                         <i class="fas fa-database me-2"></i>Connect Database
                     </a>
-                    <a href="{{ url_for('manage_page') }}" class="btn btn-outline-success">
+                    <a href="{{ url_for('data.manage_page') }}" class="btn btn-outline-success">
                         <i class="fas fa-edit me-2"></i>Manage Data
                     </a>
-                    <a href="{{ url_for('visualize_page') }}" class="btn btn-outline-info">
+                    <a href="{{ url_for('viz.visualize_page') }}" class="btn btn-outline-info">
                         <i class="fas fa-chart-bar me-2"></i>Visualize Data
                     </a>
-                    <a href="{{ url_for('query_history') }}" class="btn btn-outline-secondary">
+                    <a href="{{ url_for('data.query_history') }}" class="btn btn-outline-secondary">
                         <i class="fas fa-history me-2"></i>View History
                     </a>
                 </div>
