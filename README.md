@@ -71,8 +71,8 @@ A modern, web-based database management and visualization platform built with Fl
 
 4. **Set up environment variables**
    ```bash
-   export SECRET_KEY="your-secret-key-here"
-   export HUGGINGFACE_API_KEY="your-huggingface-api-key"
+   cp .env.example .env
+   # Edit .env and fill in SECRET_KEY and optionally HUGGINGFACE_API_KEY
    ```
 
 5. **Run the application**
@@ -128,6 +128,7 @@ ChatDB/
 ├── requirements.txt       # Python dependencies
 ├── render.yaml           # Render deployment configuration
 ├── deploy.sh            # Deployment automation script
+├── .env.example         # Environment variable template
 ├── templates/           # HTML templates
 │   ├── base.html       # Base template
 │   ├── index.html      # Home page
@@ -228,5 +229,5 @@ If you encounter any issues or have questions:
 
 ---
 
-**Made by the ChatDB Team**
+**Made by [Dhyey Desai](https://github.com/DHYEY166)**
 
